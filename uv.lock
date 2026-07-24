@@ -356,7 +356,10 @@ name = "inner-circle-app"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "email-validator" },
     { name = "fastapi", extra = ["standard"] },
+    { name = "pydantic", extra = ["email"] },
+    { name = "python-multipart" },
 ]
 
 [package.dev-dependencies]
@@ -367,7 +370,12 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "fastapi", extras = ["standard"], specifier = ">=0.139.2" }]
+requires-dist = [
+    { name = "email-validator", specifier = ">=2.3.0" },
+    { name = "fastapi", extras = ["standard"], specifier = ">=0.139.2" },
+    { name = "pydantic", extras = ["email"], specifier = ">=2.13.4" },
+    { name = "python-multipart", specifier = ">=0.0.32" },
+]
 
 [package.metadata.requires-dev]
 dev = [
