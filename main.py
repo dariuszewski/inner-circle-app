@@ -90,12 +90,8 @@ async def create_item(
     filename = pathlib.Path(file.filename).name
     file_path = UPLOAD_DIRECTORY / filename
 
-    try:
-        with file_path.open("wb") as destination:
-            while chunk := await file.read(1024 * 1024):
-                destination.write(chunk)
-    finally:
-        await file.close()
+    with file_path.open("wb") as destination:
+        destination.write(await file.read())
 
     item = MediaItem(
         id=len(collection) + 1,
