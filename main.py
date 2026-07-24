@@ -36,11 +36,8 @@ class MediaType(enum.StrEnum):
     video = "video"
 
 
-def get_media_type(raw_media_type: str | None = None) -> str:
-    if not raw_media_type:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Missing media type"
-        )
+def get_media_type(raw_media_type: str) -> str:
+
     if raw_media_type.startswith("image/"):
         return MediaType.image
     elif raw_media_type.startswith("video/"):
@@ -160,6 +157,12 @@ async def create_item(
             detail="Uploaded file has no filename",
         )
 
+    if not file.content_type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file has no content type",
+        )
+
     filename = pathlib.Path(file.filename).name
     file_path = UPLOAD_DIRECTORY / filename
 
@@ -197,7 +200,7 @@ async def update_item(
             item_dict = item.model_dump()
             item_dict.update({"updated_by": updated_by})
             return item_dict
-    return {"message": "item not found."}
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
 
 @app.get("/items/")
@@ -217,7 +220,7 @@ async def get_item(
             response.set_cookie(key="last_viewed_location", value=str(item.location))
             response.headers["X-Item-Name"] = item.name
             return item
-    return {"message": "item not found."}
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
 
 @app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
