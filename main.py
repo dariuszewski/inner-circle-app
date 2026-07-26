@@ -1,8 +1,9 @@
 import enum
 import json
+import logging
 import pathlib
 from collections.abc import AsyncIterator
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import (
     Body,
@@ -15,11 +16,13 @@ from fastapi import (
     HTTPException,
     Path,
     Query,
+    Request,
     Response,
     UploadFile,
     status,
 )
 from fastapi.encoders import jsonable_encoder
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field, computed_field
@@ -29,11 +32,44 @@ BASE_MEDIA_URL: str = "http://127.0.0.1:8000/media"
 UPLOAD_DIRECTORY.mkdir(exist_ok=True)
 
 app = FastAPI()
+
+
 app.mount(
     "/media",
     StaticFiles(directory=UPLOAD_DIRECTORY),
     name="media",
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+logging.basicConfig(
+    filename="requests.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+
+logger: logging.Logger = logging.getLogger("requests")
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next: Any) -> Any:
+    response = await call_next(request)
+
+    logger.info(
+        "%s %s status=%s",
+        request.method,
+        request.url.path,
+        response.status_code,
+    )
+
+    return response
+
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 

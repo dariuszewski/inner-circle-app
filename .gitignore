@@ -17,3 +17,4 @@ wheels/
 # Development 
 uploads/
 .env
+requests.log
