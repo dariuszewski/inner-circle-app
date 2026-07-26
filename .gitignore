@@ -16,4 +16,4 @@ wheels/
 
 # Development 
 uploads/
-
+.env
