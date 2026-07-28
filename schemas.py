@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from models import MediaType
+
 
 class Token(BaseModel):
     access_token: str
@@ -46,13 +48,20 @@ class MediaBase(BaseModel):
     url: str
 
 
-class MediaRetrieve(MediaBase):
+class MediaCreate(BaseModel):
+    file_name: str
+    media_type: MediaType
+    uploaded_by_id: int
+    collection_id: int
+
+
+class MediaRetrieve(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    created_at: datetime
-    user_id: int
-    collection_id: int | None = None
+    file_name: str
+    media_type: str
+    uploaded_at: datetime
 
 
 class CollectionBase(BaseModel):

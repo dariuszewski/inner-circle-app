@@ -31,6 +31,7 @@ from sqlalchemy import or_, select
 from database import AsyncSessionLocal, engine
 from models import Base, User
 from routes.collections import router as collection_router
+from routes.media import router as media_router
 from routes.users import router as user_router
 from utils.auth import get_password_hash
 
@@ -79,6 +80,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(lifespan=lifespan)
 app.include_router(user_router)
 app.include_router(collection_router)
+app.include_router(media_router)
 
 app.mount(
     "/media",
