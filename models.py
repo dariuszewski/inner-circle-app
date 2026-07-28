@@ -29,9 +29,8 @@ class ReactionType(StrEnum):
 
 
 class UserCollectionRole(StrEnum):
-    OWNER = "owner"
     CONTRIBUTOR = "contributor"
-    VIEWER = "viewer"
+    MODERATOR = "moderator"
 
 
 class User(Base):
@@ -41,6 +40,7 @@ class User(Base):
         primary_key=True,
         autoincrement=True,
     )
+
     username: Mapped[str] = mapped_column(
         String(30),
         unique=True,
@@ -69,20 +69,22 @@ class User(Base):
         nullable=False,
     )
 
-    created_collections: Mapped[list["Collection"]] = relationship(
-        back_populates="user",
+    owned_collections: Mapped[list["Collection"]] = relationship(
+        back_populates="created_by",
         passive_deletes=True,
     )
+
     collection_memberships: Mapped[list["UserCollection"]] = relationship(
         back_populates="user",
         passive_deletes=True,
     )
+
     uploaded_media: Mapped[list["Media"]] = relationship(
-        back_populates="user",
+        back_populates="uploaded_by",
         passive_deletes=True,
     )
     comments: Mapped[list["Comment"]] = relationship(
-        back_populates="user",
+        back_populates="author",
         passive_deletes=True,
     )
     reactions: Mapped[list["Reaction"]] = relationship(
@@ -98,6 +100,7 @@ class Collection(Base):
         primary_key=True,
         autoincrement=True,
     )
+
     name: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
@@ -112,18 +115,20 @@ class Collection(Base):
         default=lambda: datetime.now(UTC),
     )
 
-    user_id: Mapped[int | None] = mapped_column(
+    created_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
-    user: Mapped["User | None"] = relationship(
-        back_populates="created_collections",
+
+    created_by: Mapped["User | None"] = relationship(
+        back_populates="owned_collections",
     )
 
-    user_collections: Mapped[list["UserCollection"]] = relationship(
+    collection_memberships: Mapped[list["UserCollection"]] = relationship(
         back_populates="collection",
         passive_deletes=True,
     )
+
     media: Mapped[list["Media"]] = relationship(
         back_populates="collection",
         passive_deletes=True,
@@ -132,6 +137,15 @@ class Collection(Base):
 
 class UserCollection(Base):
     __tablename__ = "user_collections"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    collection_id: Mapped[int] = mapped_column(
+        ForeignKey("collections.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
 
     user_role: Mapped[UserCollectionRole] = mapped_column(
         Enum(
@@ -143,22 +157,11 @@ class UserCollection(Base):
         default=UserCollectionRole.CONTRIBUTOR,
     )
 
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        primary_key=True,
-    )
-    collection_id: Mapped[int] = mapped_column(
-        ForeignKey("collections.id", ondelete="CASCADE"),
-        nullable=False,
-        primary_key=True,
-    )
-
     user: Mapped["User"] = relationship(
         back_populates="collection_memberships",
     )
     collection: Mapped["Collection"] = relationship(
-        back_populates="user_collections",
+        back_populates="collection_memberships",
     )
 
 
@@ -197,7 +200,7 @@ class Media(Base):
         default=lambda: datetime.now(UTC),
     )
 
-    user_id: Mapped[int] = mapped_column(
+    uploaded_by_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
@@ -206,7 +209,7 @@ class Media(Base):
         nullable=False,
     )
 
-    user: Mapped["User"] = relationship(
+    uploaded_by: Mapped["User"] = relationship(
         back_populates="uploaded_media",
     )
     collection: Mapped["Collection"] = relationship(
@@ -243,7 +246,7 @@ class Comment(Base):
         ForeignKey("media.id", ondelete="CASCADE"),
         nullable=False,
     )
-    user_id: Mapped[int | None] = mapped_column(
+    author_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -251,7 +254,7 @@ class Comment(Base):
     media: Mapped["Media"] = relationship(
         back_populates="comments",
     )
-    user: Mapped["User | None"] = relationship(
+    author: Mapped["User | None"] = relationship(
         back_populates="comments",
     )
 

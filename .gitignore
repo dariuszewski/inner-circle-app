@@ -19,3 +19,4 @@ uploads/
 .env
 requests.log
 dev.db
+todo.txt
