@@ -1,12 +1,13 @@
 import enum
 import json
 import logging
+import os
 import pathlib
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
 from fastapi import (
-    Body,
     Cookie,
     Depends,
     FastAPI,
@@ -23,16 +24,59 @@ from fastapi import (
 )
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field, computed_field
+from sqlalchemy import or_, select
+
+from database import AsyncSessionLocal, engine
+from models import Base, User
+from routes.users import router as user_router
+from utils.auth import get_password_hash
+
+SUPERUSER_USERNAME = os.getenv("SUPERUSER_USERNAME")
+SUPERUSER_EMAIL = os.getenv("SUPERUSER_EMAIL")
+SUPERUSER_PASSWORD = os.getenv("SUPERUSER_PASSWORD", "supersecretpassword")
 
 UPLOAD_DIRECTORY: pathlib.Path = pathlib.Path("uploads")
 BASE_MEDIA_URL: str = "http://127.0.0.1:8000/media"
 UPLOAD_DIRECTORY.mkdir(exist_ok=True)
 
-app = FastAPI()
 
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+
+    async with AsyncSessionLocal.begin() as db:
+        result = await db.execute(
+            select(User).where(
+                or_(
+                    User.username == SUPERUSER_USERNAME,
+                    User.email == SUPERUSER_EMAIL,
+                )
+            )
+        )
+        superuser = result.scalar_one_or_none()
+
+        if superuser is None:
+            db.add(
+                User(
+                    username=SUPERUSER_USERNAME,
+                    email=SUPERUSER_EMAIL,
+                    hashed_password=get_password_hash(SUPERUSER_PASSWORD),
+                    is_active=True,
+                    is_superuser=True,
+                )
+            )
+
+    try:
+        yield
+    finally:
+        await engine.dispose()
+
+
+app = FastAPI(lifespan=lifespan)
+app.include_router(user_router)
 
 app.mount(
     "/media",
@@ -69,9 +113,6 @@ async def log_requests(request: Request, call_next: Any) -> Any:
     )
 
     return response
-
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 class MediaType(enum.StrEnum):
@@ -134,27 +175,6 @@ class UserOut(UserBase):
     pass
 
 
-def fake_decode_token(token: str) -> UserIn | None:
-    user = UserIn(
-        username=token + "fakedecoded",
-        password="notarealpassword",
-        email="user@example.com",
-        full_name="John Doe",
-    )
-    return user
-
-
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> UserIn:
-    user = fake_decode_token(token)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return user
-
-
 async def get_database() -> AsyncIterator[dict]:
     try:
         with open("fake_database.json", encoding="utf-8") as database:
@@ -197,18 +217,6 @@ users: list[UserIn] = [
         full_name="User One",
     )
 ]
-
-
-@app.get("/token")
-async def get_token(token: Annotated[str, Depends(oauth2_scheme)]) -> dict:
-    return {"token": token}
-
-
-@app.get("/users/me", response_model=UserIn)
-async def read_users_me(
-    current_user: Annotated[UserIn, Depends(get_current_user)],
-) -> UserIn:
-    return current_user
 
 
 @app.post(
@@ -339,13 +347,6 @@ async def get_ads(
         if ad.location == last_viewed_location:
             return ad
     return ads[0]
-
-
-@app.post("/users/", response_model=UserOut)
-async def create_user(user: Annotated[UserIn, Body()]) -> UserOut:
-    users.append(user)
-    user_out = UserOut(username=user.username)
-    return user_out
 
 
 @app.get("/")
