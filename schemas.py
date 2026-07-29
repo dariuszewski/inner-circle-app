@@ -1,8 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field
 
-from models import MediaType
+from models import MediaType, ReactionType
 
 
 class Token(BaseModel):
@@ -42,26 +42,58 @@ class UserRetrievePrivate(UserRetrievePublic):
     is_superuser: bool
 
 
-class MediaBase(BaseModel):
-    filename: str
-    filetype: str
-    url: str
+class ReactionBase(BaseModel):
+    type: ReactionType
 
 
-class MediaCreate(BaseModel):
-    file_name: str
-    media_type: MediaType
-    uploaded_by_id: int
-    collection_id: int
+class ReactionCreate(ReactionBase):
+    pass
 
 
-class MediaRetrieve(BaseModel):
+class ReactionRetrieve(ReactionBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    file_name: str
-    media_type: str
+    user: UserRetrievePublic
+
+
+class CommentBase(BaseModel):
+    content: str = Field(min_length=1, max_length=500)
+
+
+class CommentCreate(CommentBase):
+    pass
+
+
+class CommentRetrieve(CommentBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    author: UserRetrievePublic
+
+
+class MediaBase(BaseModel):
+    file_path: str
+    media_type: MediaType
+
+
+class MediaRetrieve(MediaBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    collection_id: int
     uploaded_at: datetime
+    uploaded_by: UserRetrievePublic | None
+
+    @computed_field
+    def media_url(self) -> str:
+        base_url = "http://localhost:8000/"
+        return f"{base_url}{self.file_path}"
+
+
+class MediaRetrieveDetailed(MediaRetrieve):
+    comments: list["CommentRetrieve"] = Field(default_factory=list)
+    reactions: list["ReactionRetrieve"] = Field(default_factory=list)
 
 
 class CollectionBase(BaseModel):

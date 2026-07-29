@@ -74,7 +74,7 @@ async def get_collection(
     if collection is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Collection not found or user does not have access to it",
+            detail="Collection not found or user does not have access to it.",
         )
 
     created_by = (

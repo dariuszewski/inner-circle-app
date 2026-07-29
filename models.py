@@ -172,7 +172,7 @@ class Media(Base):
         primary_key=True,
         autoincrement=True,
     )
-    file_name: Mapped[str] = mapped_column(
+    file_path: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
     )
@@ -188,10 +188,6 @@ class Media(Base):
         nullable=False,
     )
     duration: Mapped[int | None] = mapped_column(
-        nullable=True,
-    )
-    location: Mapped[str | None] = mapped_column(
-        String(255),
         nullable=True,
     )
     uploaded_at: Mapped[datetime] = mapped_column(

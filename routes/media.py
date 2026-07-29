@@ -1,19 +1,36 @@
 import pathlib
 from typing import Annotated
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from pydantic import WithJsonSchema
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from database import get_db
-from models import Collection, Media, User, UserCollection
-from schemas import MediaRetrieve
+from models import (
+    Collection,
+    Comment,
+    Media,
+    Reaction,
+    User,
+    UserCollection,
+)
+from schemas import MediaRetrieve, MediaRetrieveDetailed, ReactionCreate
 from utils.auth import get_current_user
 from utils.media import get_media_type, upload_file
 
 router = APIRouter(
-    prefix="/collections/{collection_id:int}/media",
+    prefix="/media",
     tags=["media"],
 )
 
@@ -21,7 +38,41 @@ UPLOAD_DIRECTORY: pathlib.Path = pathlib.Path("uploads")
 UPLOAD_DIRECTORY.mkdir(exist_ok=True)
 
 
-@router.post("")
+@router.get("/{media_id}")
+async def get_media(
+    media_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> MediaRetrieveDetailed:
+    stmt = (
+        select(Media)
+        .options(
+            selectinload(Media.uploaded_by),
+            selectinload(Media.comments).selectinload(Comment.author),
+            selectinload(Media.reactions).selectinload(Reaction.user),
+        )
+        .where(
+            Media.id == media_id,
+            Media.collection_id.in_(
+                select(UserCollection.collection_id).where(
+                    UserCollection.user_id == current_user.id
+                )
+            ),
+        )
+    )
+
+    media = await db.scalar(stmt)
+
+    if media is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media not found or access denied.",
+        )
+    print("UPLOAD_DIRECTORY:", UPLOAD_DIRECTORY.resolve())
+    return MediaRetrieveDetailed.model_validate(media)
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
 async def upload_media(
     collection_id: int,
     files: Annotated[
@@ -60,23 +111,139 @@ async def upload_media(
 
     media_objs = []
     for file in files:
-        filename = pathlib.Path(file.filename).name  # type: ignore[arg-type]
-        file_path = UPLOAD_DIRECTORY / filename
+        media_type = await get_media_type(file.content_type)
+
+        extension = pathlib.Path(file.filename or "").suffix.lower()
+        file_name = f"{uuid4()}{extension}"
+
+        file_path = UPLOAD_DIRECTORY / file_name
+
         await upload_file(file, file_path)
 
         media_obj = Media(
-            file_name=file.filename,
-            media_type=get_media_type(file.content_type),
+            file_path=file_path.as_posix(),
+            media_type=media_type,
             uploaded_by_id=current_user.id,
             collection_id=collection_id,
         )
+
         db.add(media_obj)
         await db.commit()
-        await db.refresh(media_obj)
+        await db.refresh(media_obj, attribute_names=["uploaded_by"])
+
         media_objs.append(media_obj)
 
-    response_model = [
-        MediaRetrieve.model_validate(media_obj) for media_obj in media_objs
-    ]
+    response = [MediaRetrieve.model_validate(media_obj) for media_obj in media_objs]
 
-    return response_model
+    return response
+
+
+@router.delete("/{media_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_media(
+    media_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    stmt = (
+        select(Media)
+        .join(
+            UserCollection,
+            UserCollection.collection_id == Media.collection_id,
+        )
+        .where(
+            Media.id == media_id,
+            UserCollection.user_id == current_user.id,
+        )
+    )
+
+    media = await db.scalar(stmt)
+
+    if media is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media not found or access denied.",
+        )
+
+    file_path = pathlib.Path(media.file_path)
+
+    await db.delete(media)
+    await db.commit()
+
+    file_path.unlink(missing_ok=True)
+
+
+@router.post("/comment/{media_id}", status_code=status.HTTP_201_CREATED)
+async def comment_media(
+    media_id: int,
+    comment: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    stmt = (
+        select(Media)
+        .join(
+            UserCollection,
+            UserCollection.collection_id == Media.collection_id,
+        )
+        .where(
+            Media.id == media_id,
+            UserCollection.user_id == current_user.id,
+        )
+    )
+
+    media = await db.scalar(stmt)
+
+    if media is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media not found or access denied.",
+        )
+
+    comment_obj = Comment(
+        media_id=media_id,
+        author_id=current_user.id,
+        content=comment,
+    )
+
+    db.add(comment_obj)
+    await db.commit()
+
+
+@router.post("/react/{media_id}", status_code=status.HTTP_201_CREATED)
+async def react_to_media(
+    media_id: int,
+    reaction_data: Annotated[
+        ReactionCreate,
+        Query(description="The type of reaction to add"),
+    ],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    stmt = (
+        select(Media)
+        .join(
+            UserCollection,
+            UserCollection.collection_id == Media.collection_id,
+        )
+        .where(
+            Media.id == media_id,
+            UserCollection.user_id == current_user.id,
+        )
+    )
+
+    media = await db.scalar(stmt)
+
+    if media is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media not found or access denied.",
+        )
+
+    reaction_obj = Reaction(
+        media_id=media_id,
+        user_id=current_user.id,
+        type=reaction_data.type,
+    )
+
+    db.add(reaction_obj)
+    await db.commit()
