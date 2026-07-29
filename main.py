@@ -28,7 +28,6 @@ SUPERUSER_EMAIL = os.getenv("SUPERUSER_EMAIL")
 SUPERUSER_PASSWORD = os.getenv("SUPERUSER_PASSWORD", "supersecretpassword")
 
 UPLOAD_DIRECTORY: pathlib.Path = pathlib.Path("uploads")
-BASE_MEDIA_URL: str = "http://127.0.0.1:8000/media"
 UPLOAD_DIRECTORY.mkdir(exist_ok=True)
 
 
@@ -71,9 +70,9 @@ app.include_router(collection_router)
 app.include_router(media_router)
 
 app.mount(
-    "/media",
-    StaticFiles(directory=UPLOAD_DIRECTORY),
-    name="media",
+    "/uploads",
+    StaticFiles(directory="uploads"),
+    name="uploads",
 )
 
 app.add_middleware(

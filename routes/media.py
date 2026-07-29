@@ -68,7 +68,6 @@ async def get_media(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Media not found or access denied.",
         )
-    print("UPLOAD_DIRECTORY:", UPLOAD_DIRECTORY.resolve())
     return MediaRetrieveDetailed.model_validate(media)
 
 
@@ -121,7 +120,7 @@ async def upload_media(
         await upload_file(file, file_path)
 
         media_obj = Media(
-            file_path=file_path.as_posix(),
+            file_path=file_name,
             media_type=media_type,
             uploaded_by_id=current_user.id,
             collection_id=collection_id,
@@ -164,7 +163,13 @@ async def delete_media(
             detail="Media not found or access denied.",
         )
 
-    file_path = pathlib.Path(media.file_path)
+    stored_path = pathlib.Path(media.file_path)
+    if not stored_path.is_absolute() and (
+        len(stored_path.parts) == 0 or stored_path.parts[0] != UPLOAD_DIRECTORY.name
+    ):
+        file_path = UPLOAD_DIRECTORY / stored_path
+    else:
+        file_path = stored_path
 
     await db.delete(media)
     await db.commit()

@@ -87,8 +87,11 @@ class MediaRetrieve(MediaBase):
 
     @computed_field
     def media_url(self) -> str:
-        base_url = "http://localhost:8000/"
-        return f"{base_url}{self.file_path}"
+        base_url = "http://localhost:8000/static/"
+        normalized_path = self.file_path.replace("\\", "/").lstrip("/")
+        if normalized_path.startswith("uploads/"):
+            normalized_path = normalized_path.removeprefix("uploads/")
+        return f"{base_url}{normalized_path}"
 
 
 class MediaRetrieveDetailed(MediaRetrieve):
