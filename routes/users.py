@@ -22,7 +22,13 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("")
 async def get_users(
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
 ) -> list[UserRetrievePublic]:
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this resource.",
+        )
     query = await db.execute(select(User))
     users = query.scalars().all()
     return [UserRetrievePublic.model_validate(user) for user in users]
@@ -32,13 +38,19 @@ async def get_users(
 async def get_user(
     user_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
 ) -> UserRetrievePublic | None:
+    if not current_user.is_superuser and current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this resource.",
+        )
     query = await db.execute(select(User).where(User.id == user_id))
     user = query.scalar_one_or_none()
     return UserRetrievePublic.model_validate(user)
 
 
-@router.post("/register")
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 async def create_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     user_create: Annotated[UserCreate, Body()],
@@ -69,7 +81,7 @@ async def create_user(
     return UserRetrievePublic.model_validate(new_user)
 
 
-@router.post("/token", response_model=Token)
+@router.post("/token")
 async def login_for_access_token(
     db: Annotated[AsyncSession, Depends(get_db)],
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],

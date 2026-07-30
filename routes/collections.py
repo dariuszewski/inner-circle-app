@@ -74,7 +74,7 @@ async def get_collection(
     if collection is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Collection not found or user does not have access to it.",
+            detail="Collection not found or access denied.",
         )
 
     created_by = (
@@ -100,7 +100,7 @@ async def get_collection(
     )
 
 
-@router.post("")
+@router.post("", status_code=status.HTTP_201_CREATED)
 async def create_collection(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
