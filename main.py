@@ -64,7 +64,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await engine.dispose()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    title="Inner Circle FastAPI",
+    version="0.0.1",
+    description="API for the Inner Circle application.",
+)
 app.include_router(user_router)
 app.include_router(collection_router)
 app.include_router(media_router)
