@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +15,7 @@ from utils.auth import (
     oauth2_scheme,
     verify_password,
 )
+from utils.email import send_welcome_email
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -52,6 +53,7 @@ async def get_user(
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def create_user(
+    background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
     user_create: Annotated[UserCreate, Body()],
 ) -> UserRetrievePublic:
@@ -78,6 +80,10 @@ async def create_user(
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
+
+    # start a background task to send a welcome email to the new user
+    background_tasks.add_task(send_welcome_email, new_user.email, new_user.username)
+
     return UserRetrievePublic.model_validate(new_user)
 
 
