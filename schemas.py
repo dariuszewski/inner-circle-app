@@ -125,3 +125,12 @@ class CollectionRetrieveDetailed(CollectionRetrieve):
     created_by: UserRetrievePublic | None
     members: list[UserRetrievePublic] = Field(default_factory=list)
     media: list[MediaRetrieve] = Field(default_factory=list)
+
+
+class CollectionInvitationRetrieve(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    collection_id: int
+    token_hash: str
+    valid_until: datetime

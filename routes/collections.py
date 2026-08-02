@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -6,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from database import get_db
-from models import Collection, UserCollection, UserCollectionRole
+from models import Collection, CollectionInvitation, UserCollection, UserCollectionRole
 from schemas import (
     CollectionCreate,
     CollectionRetrieve,
@@ -16,6 +17,7 @@ from schemas import (
     UserRetrievePublic,
 )
 from utils.auth import get_current_user
+from utils.invitations import generate_invitation_token, hash_invitation_token
 
 router = APIRouter(
     prefix="/collections",
@@ -126,3 +128,71 @@ async def create_collection(
     await db.refresh(new_collection)
 
     return CollectionRetrieve.model_validate(new_collection)
+
+
+@router.post("/invitation/{collection_id}", status_code=status.HTTP_201_CREATED)
+async def post_create_invitation(
+    collection_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
+) -> dict[str, str]:
+
+    stmt = select(UserCollection).where(
+        UserCollection.collection_id == collection_id,
+        UserCollection.user_id == current_user.id,
+    )
+    result = await db.execute(stmt)
+    user_collection = result.scalar_one_or_none()
+
+    if user_collection is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Collection not found or access denied.",
+        )
+
+    raw_token, token_hash = generate_invitation_token()
+
+    new_invitation = CollectionInvitation(
+        collection_id=collection_id,
+        token_hash=token_hash,
+    )
+    db.add(new_invitation)
+    await db.commit()
+    await db.refresh(new_invitation)
+
+    return {"invitation_token": raw_token}
+
+
+@router.put("/accept-invitation/{token}", status_code=status.HTTP_200_OK)
+async def accept_invitation(
+    token: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
+) -> dict[str, str]:
+
+    token_hash = hash_invitation_token(token)
+
+    stmt = select(CollectionInvitation).where(
+        CollectionInvitation.token_hash == token_hash,
+        CollectionInvitation.valid_until > datetime.now(UTC),
+    )
+    result = await db.execute(stmt)
+    invitation = result.scalar_one_or_none()
+
+    if invitation is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired invitation token.",
+        )
+
+    user_collection = UserCollection(
+        collection_id=invitation.collection_id,
+        user_id=current_user.id,
+        user_role=UserCollectionRole.CONTRIBUTOR,
+    )
+    db.add(user_collection)
+
+    await db.commit()
+    await db.refresh(user_collection)
+
+    return {"message": "Invitation accepted successfully."}

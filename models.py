@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 
 from sqlalchemy import DateTime, Enum, ForeignKey, String, UniqueConstraint
@@ -134,6 +134,11 @@ class Collection(Base):
         passive_deletes=True,
     )
 
+    invitations: Mapped[list["CollectionInvitation"]] = relationship(
+        back_populates="collection",
+        passive_deletes=True,
+    )
+
 
 class UserCollection(Base):
     __tablename__ = "user_collections"
@@ -162,6 +167,43 @@ class UserCollection(Base):
     )
     collection: Mapped["Collection"] = relationship(
         back_populates="collection_memberships",
+    )
+
+
+class CollectionInvitation(Base):
+    __tablename__ = "collection_invitations"
+
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    token_hash: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+    )
+
+    valid_until: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC) + timedelta(minutes=60),
+    )
+
+    collection_id: Mapped[int] = mapped_column(
+        ForeignKey("collections.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    collection: Mapped["Collection"] = relationship(
+        back_populates="invitations",
     )
 
 
