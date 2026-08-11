@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, status
@@ -6,12 +7,25 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models import User
-from schemas import Token, UserCreate, UserRetrievePrivate, UserRetrievePublic
+from models import RefreshToken, User
+from schemas import (
+    LogoutRequest,
+    RefreshTokenRequest,
+    Token,
+    UserCreate,
+    UserRetrievePrivate,
+    UserRetrievePublic,
+)
 from utils.auth import (
     create_access_token,
+    create_refresh_token,
     get_current_user,
     get_password_hash,
+    hash_token,
+    invalidate_refresh_token,
+    invalidate_refresh_token_family,
+    is_refresh_token_family_reused,
+    is_refresh_token_valid,
     oauth2_scheme,
     verify_password,
 )
@@ -104,7 +118,135 @@ async def login_for_access_token(
         )
 
     access_token = create_access_token(data={"sub": str(user.id)})
-    return Token(access_token=access_token, token_type="bearer")
+    refresh_token_raw, refresh_token_hash, family_id, expires_at = (
+        create_refresh_token()
+    )
+
+    refresh_token = RefreshToken(
+        user_id=user.id,
+        family_id=family_id,
+        token_hash=refresh_token_hash,
+        expires_at=expires_at,
+    )
+    db.add(refresh_token)
+    await db.commit()
+
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token_raw,
+        token_type="bearer",
+    )
+
+
+@router.post("/refresh")
+async def refresh_access_token(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    refresh_request: Annotated[RefreshTokenRequest, Body()],
+) -> Token:
+    provided_token = refresh_request.refresh_token
+    token_hash = hash_token(provided_token)
+
+    result = await db.execute(
+        select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+    )
+    refresh_token_record: RefreshToken | None = result.scalar_one_or_none()
+
+    if not refresh_token_record:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token.",
+        )
+
+    if not is_refresh_token_valid(refresh_token_record):
+        invalidate_refresh_token(refresh_token_record)
+        await db.commit()
+        if (
+            refresh_token_record.revoked_at is not None
+            and refresh_token_record.expires_at <= datetime.now(UTC)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token has expired.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has been revoked.",
+        )
+
+    sibling_tokens_result = await db.execute(
+        select(RefreshToken).where(
+            RefreshToken.family_id == refresh_token_record.family_id
+        )
+    )
+    sibling_tokens = sibling_tokens_result.scalars().all()
+    if is_refresh_token_family_reused(sibling_tokens, refresh_token_record.id):
+        now = datetime.now(UTC)
+        invalidate_refresh_token_family(sibling_tokens, now)
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token reuse detected; family invalidated.",
+        )
+
+    user = await db.get(User, refresh_token_record.user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User no longer exists or is inactive.",
+        )
+
+    invalidate_refresh_token(refresh_token_record)
+
+    new_access_token = create_access_token(data={"sub": str(user.id)})
+    new_refresh_token_raw, new_refresh_token_hash, family_id, new_expires_at = (
+        create_refresh_token(family_id=refresh_token_record.family_id)
+    )
+
+    new_refresh_token = RefreshToken(
+        user_id=user.id,
+        family_id=family_id,
+        token_hash=new_refresh_token_hash,
+        expires_at=new_expires_at,
+    )
+    db.add(new_refresh_token)
+    await db.commit()
+
+    return Token(
+        access_token=new_access_token,
+        refresh_token=new_refresh_token_raw,
+        token_type="bearer",
+    )
+
+
+@router.post("/logout")
+async def logout_user(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    logout_request: Annotated[LogoutRequest, Body()],
+) -> dict[str, str]:
+    provided_token = logout_request.refresh_token
+    token_hash = hash_token(provided_token)
+
+    result = await db.execute(
+        select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+    )
+    refresh_token_record: RefreshToken | None = result.scalar_one_or_none()
+
+    if refresh_token_record is None:
+        return {"detail": "Refresh token already invalid or not found."}
+
+    if logout_request.all_sessions:
+        family_result = await db.execute(
+            select(RefreshToken).where(
+                RefreshToken.family_id == refresh_token_record.family_id
+            )
+        )
+        family_tokens = family_result.scalars().all()
+        invalidate_refresh_token_family(family_tokens)
+    else:
+        invalidate_refresh_token(refresh_token_record)
+
+    await db.commit()
+    return {"detail": "Refresh token revoked."}
 
 
 @router.get("/token")
