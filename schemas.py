@@ -1,8 +1,12 @@
 from datetime import datetime
+from math import ceil
+from typing import Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, computed_field
 
 from models import MediaType, ReactionType
+
+T = TypeVar("T")
 
 
 class Token(BaseModel):
@@ -95,12 +99,12 @@ class MediaRetrieve(MediaBase):
     uploaded_by: UserRetrievePublic | None
 
     @computed_field
-    def media_url(self) -> str:
+    def media_url(self) -> HttpUrl:
         base_url = "http://localhost:8000/static/"
         normalized_path = self.file_path.replace("\\", "/").lstrip("/")
         if normalized_path.startswith("uploads/"):
             normalized_path = normalized_path.removeprefix("uploads/")
-        return f"{base_url}{normalized_path}"
+        return HttpUrl(f"{base_url}{normalized_path}")
 
 
 class MediaRetrieveDetailed(MediaRetrieve):
@@ -129,10 +133,46 @@ class CollectionRetrieve(CollectionBase):
     created_at: datetime
 
 
+class PaginatedResponse(BaseModel, Generic[T]):  # noqa
+    total_items: int
+    page: int
+    per_page: int
+    total_pages: int
+    items: list[T]
+
+    @classmethod
+    def from_items(
+        cls,
+        items: list[T],
+        *,  # next parameters must be specified as keyword arguments
+        page: int,
+        per_page: int,
+    ) -> "PaginatedResponse[T]":
+        total_items = len(items)
+        total_pages = ceil(total_items / per_page) if total_items else 0
+        start_index = (page - 1) * per_page
+        end_index = start_index + per_page
+
+        paginated_items = list(items[start_index:end_index])
+
+        return cls(
+            total_items=total_items,
+            page=page,
+            per_page=per_page,
+            total_pages=total_pages,
+            items=paginated_items,
+        )
+
+
 class CollectionRetrieveDetailed(CollectionRetrieve):
     created_by_id: int | None
     created_by: UserRetrievePublic | None
+    members_count: int
     members: list[UserRetrievePublic] = Field(default_factory=list)
+    total_items: int
+    page: int
+    per_page: int
+    total_pages: int
     media: list[MediaRetrieve] = Field(default_factory=list)
 
 

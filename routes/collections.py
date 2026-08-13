@@ -1,18 +1,25 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from database import get_db
-from models import Collection, CollectionInvitation, UserCollection, UserCollectionRole
+from models import (
+    Collection,
+    CollectionInvitation,
+    Media,
+    UserCollection,
+    UserCollectionRole,
+)
 from schemas import (
     CollectionCreate,
     CollectionRetrieve,
     CollectionRetrieveDetailed,
     MediaRetrieve,
+    PaginatedResponse,
     UserRetrievePrivate,
     UserRetrievePublic,
 )
@@ -51,6 +58,11 @@ async def get_collection(
         UserRetrievePrivate,
         Depends(get_current_user),
     ],
+    page: Annotated[int, Query(ge=1, description="Page number starting from 1")] = 1,
+    per_page: Annotated[
+        int,
+        Query(ge=1, le=50, description="Number of media items per page"),
+    ] = 10,
 ) -> CollectionRetrieveDetailed:
     stmt = (
         select(Collection)
@@ -64,7 +76,6 @@ async def get_collection(
         )
         .options(
             selectinload(Collection.created_by),
-            selectinload(Collection.media),
             selectinload(Collection.collection_memberships).selectinload(
                 UserCollection.user
             ),
@@ -88,7 +99,21 @@ async def get_collection(
         UserRetrievePublic.model_validate(membership.user)
         for membership in collection.collection_memberships
     ]
-    media_items = [MediaRetrieve.model_validate(media) for media in collection.media]
+
+    media_stmt = (
+        select(Media)
+        .where(Media.collection_id == collection_id)
+        .order_by(Media.uploaded_at.desc(), Media.id.desc())
+    )
+    media_result = await db.execute(media_stmt)
+    media_items = [
+        MediaRetrieve.model_validate(media) for media in media_result.scalars().all()
+    ]
+    paginated_media = PaginatedResponse[MediaRetrieve].from_items(
+        media_items,
+        page=page,
+        per_page=per_page,
+    )
 
     return CollectionRetrieveDetailed(
         id=collection.id,
@@ -97,8 +122,13 @@ async def get_collection(
         created_at=collection.created_at,
         created_by_id=collection.created_by_id,
         created_by=created_by,
+        members_count=len(members),
         members=members,
-        media=media_items,
+        total_items=paginated_media.total_items,
+        page=paginated_media.page,
+        per_page=paginated_media.per_page,
+        total_pages=paginated_media.total_pages,
+        media=paginated_media.items,
     )
 
 
@@ -106,7 +136,7 @@ async def get_collection(
 async def create_collection(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
-    create_collection: Annotated[CollectionCreate, Depends()],
+    create_collection: Annotated[CollectionCreate, Body()],
 ) -> CollectionRetrieve:
     new_collection = Collection(
         name=create_collection.name,
