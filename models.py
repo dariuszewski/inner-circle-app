@@ -109,10 +109,12 @@ class Collection(Base):
         String(100),
         nullable=False,
     )
+
     description: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
     )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -121,6 +123,11 @@ class Collection(Base):
 
     created_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    cover_image_id: Mapped[int | None] = mapped_column(
+        ForeignKey("media.id", ondelete="SET NULL"),
         nullable=True,
     )
 
@@ -135,7 +142,13 @@ class Collection(Base):
 
     media: Mapped[list["Media"]] = relationship(
         back_populates="collection",
+        foreign_keys="Media.collection_id",
         passive_deletes=True,
+    )
+
+    cover_image: Mapped["Media | None"] = relationship(
+        back_populates="cover_for_collections",
+        foreign_keys=[cover_image_id],
     )
 
     invitations: Mapped[list["CollectionInvitation"]] = relationship(
@@ -218,13 +231,16 @@ class Media(Base):
         primary_key=True,
         autoincrement=True,
     )
+
     file_path: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
     )
+
     file_size: Mapped[int | None] = mapped_column(
         nullable=True,
     )
+
     media_type: Mapped[MediaType] = mapped_column(
         Enum(
             MediaType,
@@ -233,9 +249,11 @@ class Media(Base):
         ),
         nullable=False,
     )
+
     duration: Mapped[int | None] = mapped_column(
         nullable=True,
     )
+
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -246,6 +264,7 @@ class Media(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
+
     collection_id: Mapped[int] = mapped_column(
         ForeignKey("collections.id", ondelete="CASCADE"),
         nullable=False,
@@ -254,13 +273,22 @@ class Media(Base):
     uploaded_by: Mapped["User"] = relationship(
         back_populates="uploaded_media",
     )
+
     collection: Mapped["Collection"] = relationship(
         back_populates="media",
+        foreign_keys=[collection_id],
     )
+
+    cover_for_collections: Mapped[list["Collection"]] = relationship(
+        back_populates="cover_image",
+        foreign_keys="Collection.cover_image_id",
+    )
+
     comments: Mapped[list["Comment"]] = relationship(
         back_populates="media",
         passive_deletes=True,
     )
+
     reactions: Mapped[list["Reaction"]] = relationship(
         back_populates="media",
         passive_deletes=True,

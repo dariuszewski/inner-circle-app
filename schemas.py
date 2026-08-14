@@ -124,6 +124,9 @@ class CollectionCreate(CollectionBase):
 class CollectionUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     description: str | None = Field(default=None, max_length=500)
+    cover_image_id: int | None = Field(
+        default=None, description="ID of the cover image media"
+    )
 
 
 class CollectionRetrieve(CollectionBase):
@@ -131,6 +134,7 @@ class CollectionRetrieve(CollectionBase):
 
     id: int
     created_at: datetime
+    cover_image: MediaRetrieve | None = None
 
 
 class PaginatedResponse(BaseModel, Generic[T]):  # noqa

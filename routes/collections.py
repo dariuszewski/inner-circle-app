@@ -18,6 +18,7 @@ from schemas import (
     CollectionCreate,
     CollectionRetrieve,
     CollectionRetrieveDetailed,
+    CollectionUpdate,
     MediaRetrieve,
     PaginatedResponse,
     UserRetrievePrivate,
@@ -38,12 +39,16 @@ async def get_collections(
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
 ) -> list[CollectionRetrieve]:
 
-    stmt = select(Collection).where(
-        Collection.id.in_(
-            select(UserCollection.collection_id).where(
-                UserCollection.user_id == current_user.id
+    stmt = (
+        select(Collection)
+        .where(
+            Collection.id.in_(
+                select(UserCollection.collection_id).where(
+                    UserCollection.user_id == current_user.id
+                )
             )
         )
+        .options(selectinload(Collection.cover_image).selectinload(Media.uploaded_by))
     )
     collections = await db.scalars(stmt)
 
@@ -79,6 +84,7 @@ async def get_collection(
             selectinload(Collection.collection_memberships).selectinload(
                 UserCollection.user
             ),
+            selectinload(Collection.cover_image).selectinload(Media.uploaded_by),
         )
     )
     result = await db.execute(stmt)
@@ -122,6 +128,7 @@ async def get_collection(
         created_at=collection.created_at,
         created_by_id=collection.created_by_id,
         created_by=created_by,
+        cover_image=MediaRetrieve.model_validate(collection.cover_image),
         members_count=len(members),
         members=members,
         total_items=paginated_media.total_items,
@@ -158,6 +165,42 @@ async def create_collection(
     await db.refresh(new_collection)
 
     return CollectionRetrieve.model_validate(new_collection)
+
+
+@router.put("/{collection_id}")
+async def update_collection(
+    collection_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
+    update_collection: Annotated[CollectionUpdate, Body()],
+) -> CollectionRetrieve:
+    stmt = (
+        select(Collection)
+        .where(
+            Collection.id == collection_id,
+            Collection.created_by_id == current_user.id,
+        )
+        .options(selectinload(Collection.cover_image).selectinload(Media.uploaded_by))
+    )
+    result = await db.execute(stmt)
+    collection = result.scalar_one_or_none()
+
+    if collection is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Collection not found or access denied.",
+        )
+
+    collection.name = update_collection.name or collection.name
+    collection.description = update_collection.description or collection.description
+    collection.cover_image_id = (
+        update_collection.cover_image_id or collection.cover_image_id
+    )
+
+    await db.commit()
+    await db.refresh(collection)
+
+    return CollectionRetrieve.model_validate(collection)
 
 
 @router.post("/invitation/{collection_id}", status_code=status.HTTP_201_CREATED)
