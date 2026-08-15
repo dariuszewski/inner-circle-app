@@ -54,7 +54,21 @@ dev = [
     "mypy>=2.3.0",
     "pre-commit>=4.6.1",
     "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
     "python-dotenv>=1.2.2",
     "ruff>=0.15.22",
 ]
 
+[tool.pytest.ini_options]
+addopts = "--cov=. --cov-report=term-missing --cov-report=html --cov-report=xml"
+
+[tool.coverage.run]
+omit = [
+    "tests/*",
+    "*/tests/*",
+    "*/__init__.py",
+    "*/config.py",
+]
+
+[tool.coverage.report]
+show_missing = true

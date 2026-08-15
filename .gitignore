@@ -7,6 +7,7 @@ wheels/
 *.egg-info
 .mypy_cache/
 .ruff_cache/
+.pytest_cache/
 
 # Virtual environments
 .venv
@@ -20,3 +21,6 @@ uploads/
 requests.log
 dev.db
 todo.txt
+.coverage
+coverage.xml
+htmlcov/
