@@ -1,5 +1,5 @@
-import logging
 import pathlib
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
@@ -22,6 +22,7 @@ from routes.collections import router as collection_router
 from routes.media import router as media_router
 from routes.users import router as user_router
 from utils.auth import get_password_hash
+from utils.logging_config import logger, request_id_context
 
 pathlib.Path(settings.upload_directory).mkdir(exist_ok=True)
 
@@ -83,27 +84,24 @@ app.add_middleware(
     allow_headers=settings.cors_allow_headers,
 )
 
-logging.basicConfig(
-    filename=settings.log_file,
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
-
-logger: logging.Logger = logging.getLogger("requests")
-
 
 @app.middleware("http")
-async def log_requests(request: Request, call_next: Any) -> Any:
-    response = await call_next(request)
+async def add_request_id(request: Request, call_next: Any) -> Any:
+    request_id = str(uuid.uuid4())
+    token = request_id_context.set(request_id)
 
-    logger.info(
-        "%s %s status=%s",
-        request.method,
-        request.url.path,
-        response.status_code,
-    )
-
-    return response
+    try:
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        logger.info(
+            "%s %s status=%s",
+            request.method,
+            request.url.path,
+            response.status_code,
+        )
+        return response
+    finally:
+        request_id_context.reset(token)
 
 
 class Ad(BaseModel):

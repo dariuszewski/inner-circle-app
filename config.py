@@ -34,7 +34,10 @@ class Settings(BaseSettings):
     base_url: str = "http://localhost:8000"
 
     # Logs settings
-    log_file: str = "requests.log"
+    log_file: str | None = "requests.log"
+    log_max_bytes: int = 1024 * 1024
+    log_backup_count: int = 3
+    debug: bool = False
 
 
 settings = Settings()
