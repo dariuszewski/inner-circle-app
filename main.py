@@ -5,14 +5,12 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
 from fastapi import (
-    Cookie,
     FastAPI,
     Header,
     Request,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 from sqlalchemy import or_, select
 
 from config import settings
@@ -102,31 +100,6 @@ async def add_request_id(request: Request, call_next: Any) -> Any:
         return response
     finally:
         request_id_context.reset(token)
-
-
-class Ad(BaseModel):
-    id: int
-    company: str
-    location: str
-
-
-ads: list[Ad] = [
-    Ad(id=1, company="Company A", location="loc1"),
-    Ad(id=2, company="Company B", location="loc2"),
-    Ad(id=3, company="Company C", location="loc3"),
-]
-
-
-@app.get("/ads/")
-async def get_ads(
-    last_viewed_location: Annotated[str | None, Cookie()] = None,
-) -> Ad | None:
-    if last_viewed_location is None:
-        return ads[0]
-    for ad in ads:
-        if ad.location == last_viewed_location:
-            return ad
-    return ads[0]
 
 
 @app.get("/")
