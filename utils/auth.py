@@ -1,27 +1,19 @@
 import hashlib
-import os
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from secrets import token_urlsafe
 from typing import Annotated
 
 import jwt
-from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pwdlib import PasswordHash
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
 from database import get_db
 from models import RefreshToken, User
 from schemas import UserRetrievePrivate
-
-load_dotenv()
-
-SECRET_KEY = os.environ["SECRET_KEY"]
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
 password_hash = PasswordHash.recommended()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/token")
@@ -53,7 +45,9 @@ def create_refresh_token(
     if expires_delta is not None:
         expires_at = datetime.now(UTC) + timedelta(days=expires_delta)
     else:
-        expires_at = datetime.now(UTC) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        expires_at = datetime.now(UTC) + timedelta(
+            days=settings.refresh_token_expire_days
+        )
     return raw_token, token_hash, active_family_id, expires_at
 
 
@@ -124,9 +118,15 @@ def create_access_token(data: dict, expires_delta: int | None = None) -> str:
     if expires_delta is not None:
         expire = datetime.now(UTC) + timedelta(minutes=expires_delta)
     else:
-        expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(UTC) + timedelta(
+            minutes=settings.access_token_expire_minutes
+        )
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(
+        to_encode,
+        settings.secret_key,
+        algorithm=settings.algorithm,
+    )
     return encoded_jwt
 
 
@@ -134,8 +134,8 @@ def verify_access_token(token: str) -> dict | None:
     try:
         payload = jwt.decode(
             token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM],
+            settings.secret_key,
+            algorithms=[settings.algorithm],
             options={"require": ["exp", "sub"]},
         )
         return payload

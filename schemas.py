@@ -4,6 +4,7 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, computed_field
 
+from config import settings
 from models import MediaType, ReactionType
 
 T = TypeVar("T")
@@ -100,10 +101,8 @@ class MediaRetrieve(MediaBase):
 
     @computed_field
     def media_url(self) -> HttpUrl:
-        base_url = "http://localhost:8000/static/"
+        base_url = f"{settings.base_url}/uploads/"
         normalized_path = self.file_path.replace("\\", "/").lstrip("/")
-        if normalized_path.startswith("uploads/"):
-            normalized_path = normalized_path.removeprefix("uploads/")
         return HttpUrl(f"{base_url}{normalized_path}")
 
 

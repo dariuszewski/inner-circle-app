@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from config import settings
 from database import get_db
 from models import (
     Collection,
@@ -34,8 +35,7 @@ router = APIRouter(
     tags=["media"],
 )
 
-UPLOAD_DIRECTORY: pathlib.Path = pathlib.Path("uploads")
-UPLOAD_DIRECTORY.mkdir(exist_ok=True)
+UPLOAD_DIRECTORY: pathlib.Path = pathlib.Path(settings.upload_directory)
 
 
 @router.get("/{media_id}")

@@ -1,5 +1,4 @@
 import logging
-import os
 import pathlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -16,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import or_, select
 
+from config import settings
 from database import AsyncSessionLocal, engine
 from models import Base, User
 from routes.collections import router as collection_router
@@ -23,12 +23,7 @@ from routes.media import router as media_router
 from routes.users import router as user_router
 from utils.auth import get_password_hash
 
-SUPERUSER_USERNAME = os.getenv("SUPERUSER_USERNAME")
-SUPERUSER_EMAIL = os.getenv("SUPERUSER_EMAIL")
-SUPERUSER_PASSWORD = os.getenv("SUPERUSER_PASSWORD", "supersecretpassword")
-
-UPLOAD_DIRECTORY: pathlib.Path = pathlib.Path("uploads")
-UPLOAD_DIRECTORY.mkdir(exist_ok=True)
+pathlib.Path(settings.upload_directory).mkdir(exist_ok=True)
 
 
 @asynccontextmanager
@@ -40,8 +35,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         result = await db.execute(
             select(User).where(
                 or_(
-                    User.username == SUPERUSER_USERNAME,
-                    User.email == SUPERUSER_EMAIL,
+                    User.username == settings.superuser_username,
+                    User.email == settings.superuser_email,
                 )
             )
         )
@@ -50,9 +45,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         if superuser is None:
             db.add(
                 User(
-                    username=SUPERUSER_USERNAME,
-                    email=SUPERUSER_EMAIL,
-                    hashed_password=get_password_hash(SUPERUSER_PASSWORD),
+                    username=settings.superuser_username,
+                    email=settings.superuser_email,
+                    hashed_password=get_password_hash(settings.superuser_password),
                     is_active=True,
                     is_superuser=True,
                 )
@@ -66,30 +61,30 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     lifespan=lifespan,
-    title="Inner Circle FastAPI",
-    version="0.0.1",
-    description="API for the Inner Circle application.",
+    title=settings.app_title,
+    version=settings.app_version,
+    description=settings.app_description,
 )
 app.include_router(user_router)
 app.include_router(collection_router)
 app.include_router(media_router)
 
 app.mount(
-    "/uploads",
-    StaticFiles(directory="uploads"),
+    settings.uploads_mount_path,
+    StaticFiles(directory=settings.upload_directory),
     name="uploads",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_allow_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=settings.cors_allow_methods,
+    allow_headers=settings.cors_allow_headers,
 )
 
 logging.basicConfig(
-    filename="requests.log",
+    filename=settings.log_file,
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
