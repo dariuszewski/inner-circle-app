@@ -1,15 +1,25 @@
 from datetime import UTC, datetime
+from math import ceil
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    HTTPException,
+    Query,
+    status,
+)
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import func, or_, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models import RefreshToken, User
+from models import RefreshToken, User, UserCollection
 from schemas import (
     LogoutRequest,
+    PaginatedResponse,
     RefreshTokenRequest,
     Token,
     UserCreate,
@@ -38,15 +48,40 @@ router = APIRouter(prefix="/users", tags=["users"])
 async def get_users(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
-) -> list[UserRetrievePublic]:
-    if not current_user.is_superuser:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this resource.",
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    per_page: Annotated[int, Query(ge=1, le=50, description="Items per page")] = 10,
+) -> PaginatedResponse[UserRetrievePublic]:
+    if current_user.is_superuser:
+        users_query = select(User)
+    else:
+        users_query = (
+            select(User)
+            .join(UserCollection, UserCollection.user_id == User.id)
+            .where(
+                UserCollection.collection_id.in_(
+                    select(UserCollection.collection_id).where(
+                        UserCollection.user_id == current_user.id
+                    )
+                )
+            )
+            .where(User.id != current_user.id)
+            .distinct()
         )
-    query = await db.execute(select(User))
+
+    total_items = (
+        await db.scalar(select(func.count()).select_from(users_query.subquery())) or 0
+    )
+
+    query = await db.execute(users_query.offset((page - 1) * per_page).limit(per_page))
     users = query.scalars().all()
-    return [UserRetrievePublic.model_validate(user) for user in users]
+
+    return PaginatedResponse[UserRetrievePublic](
+        total_items=total_items,
+        page=page,
+        per_page=per_page,
+        total_pages=ceil(total_items / per_page) if total_items else 0,
+        items=[UserRetrievePublic.model_validate(user) for user in users],
+    )
 
 
 @router.get("/{user_id:int}")
@@ -56,10 +91,26 @@ async def get_user(
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
 ) -> UserRetrievePublic | None:
     if not current_user.is_superuser and current_user.id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this resource.",
+        shares_collection = await db.scalar(
+            select(
+                exists(
+                    select(UserCollection.collection_id)
+                    .where(UserCollection.user_id == user_id)
+                    .where(
+                        UserCollection.collection_id.in_(
+                            select(UserCollection.collection_id).where(
+                                UserCollection.user_id == current_user.id
+                            )
+                        )
+                    )
+                )
+            )
         )
+        if not shares_collection:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to access this resource.",
+            )
     query = await db.execute(select(User).where(User.id == user_id))
     user = query.scalar_one_or_none()
     return UserRetrievePublic.model_validate(user)
