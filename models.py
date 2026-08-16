@@ -127,7 +127,12 @@ class Collection(Base):
     )
 
     cover_image_id: Mapped[int | None] = mapped_column(
-        ForeignKey("media.id", ondelete="SET NULL"),
+        ForeignKey(
+            "media.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_collections_cover_image_id",
+        ),
         nullable=True,
     )
 

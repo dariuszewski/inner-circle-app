@@ -8,7 +8,7 @@ from models import MediaType
 from utils.media import get_media_type, upload_file
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     ("raw_media_type", "expected"),
     [
@@ -23,7 +23,7 @@ async def test_get_media_type_accepts_supported_types(
     assert await get_media_type(raw_media_type) == expected
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 @pytest.mark.parametrize("raw_media_type", [None, "application/pdf", "text/plain"])
 async def test_get_media_type_rejects_unsupported_types(
     raw_media_type: str | None,
@@ -43,7 +43,7 @@ class FakeUploadFile(UploadFile):
         )
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_upload_file_writes_bytes_and_closes_stream(
     tmp_path: pathlib.Path,
 ) -> None:
