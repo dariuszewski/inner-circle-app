@@ -20,6 +20,7 @@ uploads/
 .env
 requests.log
 dev.db
+test.db
 todo.txt
 .coverage
 coverage.xml

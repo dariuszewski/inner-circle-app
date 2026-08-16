@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
@@ -225,7 +226,6 @@ def test_create_and_verify_access_token(
         assert payload is None
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("payload", "db_user", "expected_status", "expected_detail"),
     [
@@ -236,7 +236,7 @@ def test_create_and_verify_access_token(
         ({"sub": "123"}, None, 401, "User no longer exists"),
     ],
 )
-async def test_get_current_user_errors(
+def test_get_current_user_errors(
     payload: dict | None,
     db_user: User | None,
     expected_status: int,
@@ -244,26 +244,28 @@ async def test_get_current_user_errors(
 ) -> None:
     db = AsyncMock()
 
-    with patch(
-        "utils.auth.verify_access_token",
-        return_value=payload,
-    ):
-        if payload and payload.get("sub") == "123":
-            db.get.return_value = db_user
+    async def run_check() -> None:
+        with patch(
+            "utils.auth.verify_access_token",
+            return_value=payload,
+        ):
+            if payload and payload.get("sub") == "123":
+                db.get.return_value = db_user
 
-        with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(
-                token="test-token",
-                db=db,
-            )
+            with pytest.raises(HTTPException) as exc_info:
+                await get_current_user(
+                    token="test-token",
+                    db=db,
+                )
 
-    assert exc_info.value.status_code == expected_status
-    assert exc_info.value.detail == expected_detail
-    assert exc_info.value.headers == {"WWW-Authenticate": "Bearer"}
+        assert exc_info.value.status_code == expected_status
+        assert exc_info.value.detail == expected_detail
+        assert exc_info.value.headers == {"WWW-Authenticate": "Bearer"}
+
+    asyncio.run(run_check())
 
 
-@pytest.mark.asyncio
-async def test_get_current_user_success() -> None:
+def test_get_current_user_success() -> None:
     user = User(
         id=123,
         username="testuser",
@@ -276,16 +278,19 @@ async def test_get_current_user_success() -> None:
     db = AsyncMock()
     db.get.return_value = user
 
-    with patch(
-        "utils.auth.verify_access_token",
-        return_value={"sub": "123"},
-    ):
-        result = await get_current_user(
-            token="test-token",
-            db=db,
-        )
+    async def run_check() -> None:
+        with patch(
+            "utils.auth.verify_access_token",
+            return_value={"sub": "123"},
+        ):
+            result = await get_current_user(
+                token="test-token",
+                db=db,
+            )
 
-    db.get.assert_awaited_once_with(User, 123)
+        db.get.assert_awaited_once_with(User, 123)
 
-    assert isinstance(result, UserRetrievePrivate)
-    assert result.id == 123
+        assert isinstance(result, UserRetrievePrivate)
+        assert result.id == 123
+
+    asyncio.run(run_check())
