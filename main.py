@@ -11,15 +11,14 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import or_, select
 
 from config import settings
 from database import AsyncSessionLocal, engine
-from models import Base, User
+from models import Base
 from routes.collections import router as collection_router
 from routes.media import router as media_router
 from routes.users import router as user_router
-from utils.auth import get_password_hash
+from utils.bootstrap import ensure_superuser
 from utils.logging_config import logger, request_id_context
 
 pathlib.Path(settings.upload_directory).mkdir(exist_ok=True)
@@ -31,26 +30,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await connection.run_sync(Base.metadata.create_all)
 
     async with AsyncSessionLocal.begin() as db:
-        result = await db.execute(
-            select(User).where(
-                or_(
-                    User.username == settings.superuser_username,
-                    User.email == settings.superuser_email,
-                )
-            )
-        )
-        superuser = result.scalar_one_or_none()
-
-        if superuser is None:
-            db.add(
-                User(
-                    username=settings.superuser_username,
-                    email=settings.superuser_email,
-                    hashed_password=get_password_hash(settings.superuser_password),
-                    is_active=True,
-                    is_superuser=True,
-                )
-            )
+        await ensure_superuser(db)
 
     try:
         yield
