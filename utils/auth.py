@@ -37,17 +37,11 @@ def generate_family_id() -> str:
 
 def create_refresh_token(
     family_id: str | None = None,
-    expires_delta: int | None = None,
 ) -> tuple[str, str, str, datetime]:
     raw_token = token_urlsafe(32)
     token_hash = hash_token(raw_token)
     active_family_id = family_id or generate_family_id()
-    if expires_delta is not None:
-        expires_at = datetime.now(UTC) + timedelta(days=expires_delta)
-    else:
-        expires_at = datetime.now(UTC) + timedelta(
-            days=settings.refresh_token_expire_days
-        )
+    expires_at = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
     return raw_token, token_hash, active_family_id, expires_at
 
 
@@ -86,8 +80,7 @@ def invalidate_refresh_token_family(
 ) -> None:
     current_time = now or datetime.now(UTC)
     for token_record in token_records:
-        token_record.revoked_at = current_time
-        token_record.replaced_at = current_time
+        invalidate_refresh_token(token_record, now=current_time)
 
 
 def is_refresh_token_valid(
@@ -95,7 +88,7 @@ def is_refresh_token_valid(
     now: datetime | None = None,
 ) -> bool:
     current_time = _normalize_datetime(now or datetime.now(UTC))
-    if token_record.revoked_at is not None:
+    if token_record.revoked_at is not None or token_record.replaced_at is not None:
         return False
     return _normalize_datetime(token_record.expires_at) >= current_time
 
