@@ -33,6 +33,12 @@ class UserCollectionRole(StrEnum):
     MODERATOR = "moderator"
 
 
+class UserRole(StrEnum):
+    ADMIN = "admin"
+    REGULAR = "regular"
+    DEMO = "demo"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -64,9 +70,18 @@ class User(Base):
         default=True,
         nullable=False,
     )
-    is_superuser: Mapped[bool] = mapped_column(
+    is_verified: Mapped[bool] = mapped_column(
         default=False,
         nullable=False,
+    )
+    user_role: Mapped[UserRole] = mapped_column(
+        Enum(
+            UserRole,
+            name="user_role",
+            values_callable=lambda enum_class: [member.value for member in enum_class],
+        ),
+        nullable=False,
+        default=UserRole.REGULAR,
     )
 
     owned_collections: Mapped[list["Collection"]] = relationship(
@@ -92,6 +107,10 @@ class User(Base):
         passive_deletes=True,
     )
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+        back_populates="user",
+        passive_deletes=True,
+    )
+    registration_verifications: Mapped[list["RegistrationVerification"]] = relationship(
         back_populates="user",
         passive_deletes=True,
     )
@@ -226,6 +245,47 @@ class CollectionInvitation(Base):
 
     collection: Mapped["Collection"] = relationship(
         back_populates="invitations",
+    )
+
+
+class RegistrationVerification(Base):
+    __tablename__ = "registration_verifications"
+
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    token_hash: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+    )
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+    email: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship(
+        back_populates="registration_verifications",
     )
 
 

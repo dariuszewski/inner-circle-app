@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime
 from math import ceil
 from typing import Annotated
@@ -15,12 +16,21 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
 from database import get_db
-from models import RefreshToken, User, UserCollection
+from models import (
+    RefreshToken,
+    RegistrationVerification,
+    User,
+    UserCollection,
+    UserRole,
+)
 from schemas import (
+    DemoEmailRegistration,
     LogoutRequest,
     PaginatedResponse,
     RefreshTokenRequest,
+    RegistrationResponse,
     Token,
     UserCreate,
     UserRetrievePrivate,
@@ -29,6 +39,8 @@ from schemas import (
 from utils.auth import (
     create_access_token,
     create_refresh_token,
+    create_registration_verification_token,
+    get_current_active_user,
     get_current_user,
     get_password_hash,
     hash_token,
@@ -47,11 +59,11 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("")
 async def get_users(
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_active_user)],
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     per_page: Annotated[int, Query(ge=1, le=50, description="Items per page")] = 10,
 ) -> PaginatedResponse[UserRetrievePublic]:
-    if current_user.is_superuser:
+    if current_user.user_role == UserRole.ADMIN:
         users_query = select(User)
     else:
         users_query = (
@@ -88,9 +100,9 @@ async def get_users(
 async def get_user(
     user_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_active_user)],
 ) -> UserRetrievePublic | None:
-    if not current_user.is_superuser and current_user.id != user_id:
+    if current_user.user_role != UserRole.ADMIN and current_user.id != user_id:
         shares_collection = await db.scalar(
             select(
                 exists(
@@ -121,7 +133,12 @@ async def create_user(
     background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
     user_create: Annotated[UserCreate, Body()],
-) -> UserRetrievePublic:
+) -> RegistrationResponse:
+    user_role = UserRole.REGULAR
+    if user_create.email is None:
+        user_create.email = f"demo_{uuid.uuid4().hex[:8]}@icapp.com"
+        user_role = UserRole.DEMO
+
     existing_user = await db.scalar(
         select(User).where(
             or_(
@@ -141,15 +158,113 @@ async def create_user(
         username=user_create.username,
         email=user_create.email.lower(),
         hashed_password=get_password_hash(user_create.password),
+        user_role=user_role,
     )
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
 
+    # demo accounts are exempt from verification, so no token/link is needed
+    if user_role == UserRole.DEMO:
+        return RegistrationResponse(detail="Successfully registered as a demo user.")
+
+    raw_token, token_hash, expires_at = create_registration_verification_token()
+    db.add(
+        RegistrationVerification(
+            user_id=new_user.id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            email=new_user.email,
+        )
+    )
+    await db.commit()
+
+    # no email infra yet, so the verification link is returned directly instead of sent
+    verification_link = f"{settings.base_url}/users/verify/{raw_token}"
     # start a background task to send a welcome email to the new user
     background_tasks.add_task(send_welcome_email, new_user.email, new_user.username)
 
-    return UserRetrievePublic.model_validate(new_user)
+    return RegistrationResponse(
+        detail="Registration successful. Please verify your account.",
+        verification_link=verification_link,
+    )
+
+
+@router.patch("/elevate-demo")
+async def register_demo_user_as_regular(
+    background_tasks: BackgroundTasks,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
+    email_registration: Annotated[DemoEmailRegistration, Body()],
+) -> RegistrationResponse:
+    if current_user.user_role != UserRole.DEMO:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only demo accounts can register a real email.",
+        )
+
+    new_email = email_registration.email.lower()
+    existing_user = await db.scalar(
+        select(User).where(func.lower(User.email) == new_email)
+    )
+    if existing_user is not None and existing_user.id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already in use.",
+        )
+
+    raw_token, token_hash, expires_at = create_registration_verification_token()
+    db.add(
+        RegistrationVerification(
+            user_id=current_user.id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            email=new_email,
+        )
+    )
+    await db.commit()
+
+    verification_link = f"{settings.base_url}/users/verify/{raw_token}"
+
+    background_tasks.add_task(send_welcome_email, new_email, current_user.username)
+
+    return RegistrationResponse(
+        detail="Verification link generated for your new email.",
+        verification_link=verification_link,
+    )
+
+
+@router.get("/verify/{token}")
+async def verify_registration(
+    token: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, str]:
+    token_hash = hash_token(token)
+
+    result = await db.execute(
+        select(RegistrationVerification).where(
+            RegistrationVerification.token_hash == token_hash,
+            RegistrationVerification.expires_at > datetime.now(UTC),
+        )
+    )
+    verification = result.scalar_one_or_none()
+
+    if verification is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification link.",
+        )
+
+    user = await db.get(User, verification.user_id)
+    if user is not None:
+        user.is_verified = True
+        user.email = verification.email
+        user.user_role = UserRole.REGULAR
+
+    await db.delete(verification)
+    await db.commit()
+
+    return {"detail": "Account verified successfully."}
 
 
 @router.post("/token")

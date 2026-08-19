@@ -2,7 +2,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
-from models import User
+from models import User, UserRole
 from utils.auth import get_password_hash
 
 
@@ -29,6 +29,7 @@ async def ensure_superuser(db: AsyncSession) -> None:
             email=settings.superuser_email,
             hashed_password=get_password_hash(settings.superuser_password),
             is_active=True,
-            is_superuser=True,
+            is_verified=True,
+            user_role=UserRole.ADMIN,
         )
     )

@@ -5,7 +5,7 @@ from typing import Generic, TypeVar
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, computed_field
 
 from config import settings
-from models import MediaType, ReactionType
+from models import MediaType, ReactionType, UserRole
 
 T = TypeVar("T")
 
@@ -33,7 +33,7 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    email: EmailStr
+    email: EmailStr | None = None
     password: str = Field(min_length=8, max_length=128)
 
 
@@ -53,7 +53,17 @@ class UserRetrievePublic(UserBase):
 class UserRetrievePrivate(UserRetrievePublic):
     email: EmailStr
     is_active: bool
-    is_superuser: bool
+    is_verified: bool
+    user_role: UserRole
+
+
+class RegistrationResponse(BaseModel):
+    detail: str
+    verification_link: str | None = None
+
+
+class DemoEmailRegistration(BaseModel):
+    email: EmailStr
 
 
 class ReactionBase(BaseModel):

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_db
-from models import RefreshToken, User
+from models import RefreshToken, User, UserRole
 from schemas import UserRetrievePrivate
 
 password_hash = PasswordHash.recommended()
@@ -43,6 +43,22 @@ def create_refresh_token(
     active_family_id = family_id or generate_family_id()
     expires_at = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
     return raw_token, token_hash, active_family_id, expires_at
+
+
+def create_registration_verification_token() -> tuple[str, str, datetime]:
+    raw_token = token_urlsafe(32)
+    token_hash = hash_token(raw_token)
+    expires_at = datetime.now(UTC) + timedelta(
+        hours=settings.registration_verification_expire_hours
+    )
+    return raw_token, token_hash, expires_at
+
+
+def is_demo_account_expired(user: "User | UserRetrievePrivate") -> bool:
+    if user.user_role != UserRole.DEMO:
+        return False
+    expires_at = user.created_at + timedelta(days=settings.demo_allowed_days)
+    return _normalize_datetime(datetime.now(UTC)) >= _normalize_datetime(expires_at)
 
 
 def _normalize_datetime(value: datetime) -> datetime:
@@ -174,4 +190,24 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # demo accounts are exempt from email verification
+    if user.user_role != UserRole.DEMO and not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is not verified.",
+        )
+
     return UserRetrievePrivate.model_validate(user)
+
+
+async def get_current_active_user(
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
+) -> UserRetrievePrivate:
+    # kept separate from get_current_user so endpoints like updating one's own
+    # account remain reachable for demo users after their trial has expired
+    if is_demo_account_expired(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Demo account access has expired.",
+        )
+    return current_user

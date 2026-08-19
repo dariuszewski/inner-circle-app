@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException
 
-from models import RefreshToken, User
+from models import RefreshToken, User, UserRole
 from schemas import UserRetrievePrivate
 from utils.auth import (
     create_access_token,
@@ -273,7 +273,8 @@ def test_get_current_user_success() -> None:
         hashed_password="hashed-password",
         created_at=datetime.now(UTC),
         is_active=True,
-        is_superuser=False,
+        is_verified=True,
+        user_role=UserRole.REGULAR,
     )
     db = AsyncMock()
     db.get.return_value = user

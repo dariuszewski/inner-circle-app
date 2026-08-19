@@ -16,7 +16,7 @@ from sqlalchemy.pool import NullPool
 
 from database import get_db
 from main import app
-from models import Base, User
+from models import Base, User, UserRole
 from utils.auth import get_password_hash
 
 pytest_plugins = ["anyio"]
@@ -116,7 +116,8 @@ async def create_test_superuser(db_session: AsyncSession) -> User:
         username=os.environ["SUPERUSER_USERNAME"],
         email=os.environ["SUPERUSER_EMAIL"],
         hashed_password=get_password_hash(os.environ["SUPERUSER_PASSWORD"]),
-        is_superuser=True,
+        is_verified=True,
+        user_role=UserRole.ADMIN,
     )
 
     db_session.add(user)
@@ -134,7 +135,17 @@ async def create_test_user(
         json={"username": username, "email": email, "password": password},
     )
     assert response.status_code == 201
-    return cast(dict[str, Any], response.json())
+
+    verification_token = response.json()["verification_link"].rsplit("/", 1)[-1]
+    verify_response = await client.get(f"/users/verify/{verification_token}")
+    assert verify_response.status_code == 200
+
+    token = await login_user(client, username, password)
+    me_response = await client.get(
+        "/users/me", headers=auth_header(token["access_token"])
+    )
+    assert me_response.status_code == 200
+    return cast(dict[str, Any], me_response.json())
 
 
 async def login_user(

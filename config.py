@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
+    registration_verification_expire_hours: int = 24
 
     # Database settings
     database_url: str = "sqlite+aiosqlite:///./dev.db"
@@ -28,6 +29,9 @@ class Settings(BaseSettings):
     superuser_email: str = "admin@example.com"
     superuser_password: str = "pass1234"
     create_superuser_on_startup: bool = False
+
+    # Demo user settings
+    demo_allowed_days: int = 7
 
     # CORS settings
     cors_allow_origins: list[str] = ["*"]
