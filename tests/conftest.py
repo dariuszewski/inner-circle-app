@@ -136,8 +136,7 @@ async def create_test_user(
     )
     assert response.status_code == 201
 
-    verification_token = response.json()["verification_link"].rsplit("/", 1)[-1]
-    verify_response = await client.get(f"/users/verify/{verification_token}")
+    verify_response = await client.get(response.json()["verification_link"])
     assert verify_response.status_code == 200
 
     token = await login_user(client, username, password)

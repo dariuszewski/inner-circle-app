@@ -39,6 +39,13 @@ class UserRole(StrEnum):
     DEMO = "demo"
 
 
+class VerificationTokenPurpose(StrEnum):
+    USER_REGISTRATION = "user_registration"
+    DEMO_USER_ELEVATION = "demo_user_elevation"
+    EMAIL_CHANGE = "email_change"
+    PASSWORD_RESET = "password_reset"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -110,7 +117,7 @@ class User(Base):
         back_populates="user",
         passive_deletes=True,
     )
-    registration_verifications: Mapped[list["RegistrationVerification"]] = relationship(
+    verification_tokens: Mapped[list["VerificationToken"]] = relationship(
         back_populates="user",
         passive_deletes=True,
     )
@@ -245,47 +252,6 @@ class CollectionInvitation(Base):
 
     collection: Mapped["Collection"] = relationship(
         back_populates="invitations",
-    )
-
-
-class RegistrationVerification(Base):
-    __tablename__ = "registration_verifications"
-
-    id: Mapped[int] = mapped_column(
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    token_hash: Mapped[str] = mapped_column(
-        String(64),
-        unique=True,
-        index=True,
-        nullable=False,
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=lambda: datetime.now(UTC),
-    )
-
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-    )
-
-    email: Mapped[str] = mapped_column(
-        String(255),
-        nullable=False,
-    )
-
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-
-    user: Mapped["User"] = relationship(
-        back_populates="registration_verifications",
     )
 
 
@@ -485,4 +451,69 @@ class RefreshToken(Base):
 
     user: Mapped["User"] = relationship(
         back_populates="refresh_tokens",
+    )
+
+
+class VerificationToken(Base):
+    __tablename__ = "verification_tokens"
+
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    token_hash: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+
+    purpose: Mapped[VerificationTokenPurpose] = mapped_column(
+        Enum(
+            VerificationTokenPurpose,
+            name="verification_token_purpose",
+            values_callable=lambda enum_class: [member.value for member in enum_class],
+        ),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+    )
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+    is_used: Mapped[bool] = mapped_column(
+        default=False,
+        nullable=False,
+    )
+
+    current_email: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    future_email: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    future_password_hash: Mapped[str | None] = mapped_column(
+        String(256),
+        nullable=True,
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship(
+        back_populates="verification_tokens",
     )

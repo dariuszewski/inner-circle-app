@@ -20,26 +20,28 @@ from config import settings
 from database import get_db
 from models import (
     RefreshToken,
-    RegistrationVerification,
     User,
     UserCollection,
     UserRole,
+    VerificationToken,
+    VerificationTokenPurpose,
 )
 from schemas import (
-    DemoEmailRegistration,
     LogoutRequest,
     PaginatedResponse,
     RefreshTokenRequest,
-    RegistrationResponse,
     Token,
     UserCreate,
     UserRetrievePrivate,
     UserRetrievePublic,
+    UserUpdate,
+    UserUpdateEmail,
+    VerificationRequestResponse,
 )
 from utils.auth import (
     create_access_token,
     create_refresh_token,
-    create_registration_verification_token,
+    create_verification_token,
     get_current_active_user,
     get_current_user,
     get_password_hash,
@@ -133,7 +135,7 @@ async def create_user(
     background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
     user_create: Annotated[UserCreate, Body()],
-) -> RegistrationResponse:
+) -> VerificationRequestResponse:
     user_role = UserRole.REGULAR
     if user_create.email is None:
         user_create.email = f"demo_{uuid.uuid4().hex[:8]}@icapp.com"
@@ -166,15 +168,18 @@ async def create_user(
 
     # demo accounts are exempt from verification, so no token/link is needed
     if user_role == UserRole.DEMO:
-        return RegistrationResponse(detail="Successfully registered as a demo user.")
+        return VerificationRequestResponse(
+            detail="Successfully registered as a demo user."
+        )
 
-    raw_token, token_hash, expires_at = create_registration_verification_token()
+    raw_token, token_hash, expires_at = create_verification_token()
     db.add(
-        RegistrationVerification(
+        VerificationToken(
             user_id=new_user.id,
             token_hash=token_hash,
             expires_at=expires_at,
-            email=new_user.email,
+            current_email=new_user.email,
+            purpose=VerificationTokenPurpose.USER_REGISTRATION,
         )
     )
     await db.commit()
@@ -184,7 +189,7 @@ async def create_user(
     # start a background task to send a welcome email to the new user
     background_tasks.add_task(send_welcome_email, new_user.email, new_user.username)
 
-    return RegistrationResponse(
+    return VerificationRequestResponse(
         detail="Registration successful. Please verify your account.",
         verification_link=verification_link,
     )
@@ -195,17 +200,17 @@ async def register_demo_user_as_regular(
     background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
-    email_registration: Annotated[DemoEmailRegistration, Body()],
-) -> RegistrationResponse:
+    email_registration: Annotated[UserUpdateEmail, Body()],
+) -> VerificationRequestResponse:
     if current_user.user_role != UserRole.DEMO:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only demo accounts can register a real email.",
         )
 
-    new_email = email_registration.email.lower()
+    future_email = email_registration.email.lower()
     existing_user = await db.scalar(
-        select(User).where(func.lower(User.email) == new_email)
+        select(User).where(func.lower(User.email) == future_email)
     )
     if existing_user is not None and existing_user.id != current_user.id:
         raise HTTPException(
@@ -213,38 +218,139 @@ async def register_demo_user_as_regular(
             detail="Email already in use.",
         )
 
-    raw_token, token_hash, expires_at = create_registration_verification_token()
+    raw_token, token_hash, expires_at = create_verification_token()
     db.add(
-        RegistrationVerification(
+        VerificationToken(
             user_id=current_user.id,
             token_hash=token_hash,
             expires_at=expires_at,
-            email=new_email,
+            future_email=future_email,
+            purpose=VerificationTokenPurpose.DEMO_USER_ELEVATION,
         )
     )
     await db.commit()
 
     verification_link = f"{settings.base_url}/users/verify/{raw_token}"
 
-    background_tasks.add_task(send_welcome_email, new_email, current_user.username)
+    background_tasks.add_task(send_welcome_email, future_email, current_user.username)
 
-    return RegistrationResponse(
+    return VerificationRequestResponse(
         detail="Verification link generated for your new email.",
         verification_link=verification_link,
     )
 
 
+@router.patch("/update")
+async def update_user(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_active_user)],
+    user_update: Annotated[UserUpdate, Body()],
+) -> UserRetrievePrivate:
+
+    user = await db.get(User, current_user.id)
+    assert user is not None
+
+    user.username = user_update.username.strip()
+    await db.commit()
+    await db.refresh(user)
+
+    return UserRetrievePrivate.model_validate(user)
+
+
+@router.post("/change-email")
+async def change_user_email(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_active_user)],
+    email_change: Annotated[UserUpdateEmail, Body()],
+) -> VerificationRequestResponse:
+
+    user = await db.get(User, current_user.id)
+    assert user is not None
+
+    future_email = email_change.email.lower()
+    current_email = user.email.lower()
+
+    if future_email == current_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New email cannot be the same as the current email.",
+        )
+
+    raw_token, token_hash, expires_at = create_verification_token()
+
+    token = VerificationToken(
+        user_id=current_user.id,
+        token_hash=token_hash,
+        expires_at=expires_at,
+        current_email=current_email,
+        future_email=future_email,
+        purpose=VerificationTokenPurpose.EMAIL_CHANGE,
+    )
+
+    db.add(token)
+    await db.commit()
+
+    verification_link = f"{settings.base_url}/users/verify/{raw_token}"
+
+    # send email here and change response
+
+    return VerificationRequestResponse(
+        detail="Verification link generated for your new email.",
+        verification_link=verification_link,
+    )
+
+
+@router.post("/reset-password")
+async def request_password_reset(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    email: Annotated[UserUpdateEmail, Body()],
+) -> VerificationRequestResponse:
+    user = await db.scalar(
+        select(User).where(func.lower(User.email) == func.lower(email.email))
+    )
+
+    if user is not None:
+        raw_token, token_hash, expires_at = create_verification_token()
+
+        token = VerificationToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            current_email=user.email,
+            purpose=VerificationTokenPurpose.PASSWORD_RESET,
+        )
+
+        db.add(token)
+        await db.commit()
+
+        verification_link = f"{settings.base_url}/users/reset-password/{raw_token}"
+
+        # send email here and change response
+
+        return VerificationRequestResponse(
+            detail="Password reset link generated.",
+            verification_link=verification_link,
+        )
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No user found with the provided email.",
+        )
+
+
 @router.get("/verify/{token}")
-async def verify_registration(
+async def verify_verification_token(
     token: str,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, str]:
     token_hash = hash_token(token)
 
     result = await db.execute(
-        select(RegistrationVerification).where(
-            RegistrationVerification.token_hash == token_hash,
-            RegistrationVerification.expires_at > datetime.now(UTC),
+        select(VerificationToken).where(
+            VerificationToken.token_hash == token_hash,
+            VerificationToken.expires_at > datetime.now(UTC),
+            ~VerificationToken.is_used,
         )
     )
     verification = result.scalar_one_or_none()
@@ -255,16 +361,51 @@ async def verify_registration(
             detail="Invalid or expired verification link.",
         )
 
-    user = await db.get(User, verification.user_id)
-    if user is not None:
+    if verification.purpose == VerificationTokenPurpose.USER_REGISTRATION:
+        user = await db.get(User, verification.user_id)
+        if user is not None:
+            user.is_verified = True
+
+        verification.is_used = True
+        await db.commit()
+        return {"detail": "Account verified successfully."}
+
+    elif verification.purpose == VerificationTokenPurpose.DEMO_USER_ELEVATION:
+        user = await db.get(User, verification.user_id)
+        assert user is not None and verification.future_email is not None
         user.is_verified = True
-        user.email = verification.email
+        user.email = verification.future_email
         user.user_role = UserRole.REGULAR
 
-    await db.delete(verification)
-    await db.commit()
+        verification.is_used = True
+        await db.commit()
+        return {"detail": "Account elevated successfully."}
 
-    return {"detail": "Account verified successfully."}
+    elif verification.purpose == VerificationTokenPurpose.EMAIL_CHANGE:
+        user = await db.get(User, verification.user_id)
+        assert user is not None and verification.future_email is not None
+        user.email = verification.future_email
+
+        verification.is_used = True
+        await db.commit()
+        return {"detail": "Email changed successfully."}
+
+    elif verification.purpose == VerificationTokenPurpose.PASSWORD_RESET:
+        user = await db.get(User, verification.user_id)
+        assert user is not None and verification.future_password_hash is not None
+        user.hashed_password = verification.future_password_hash
+
+        # keep record of the password reset for auditing purposes, but delete the pwhash
+        verification.future_password_hash = None
+        verification.is_used = True
+
+        await db.commit()
+        return {"detail": "Password reset successfully."}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification purpose.",
+        )
 
 
 @router.post("/token")

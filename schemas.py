@@ -38,9 +38,11 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    username: str | None = Field(default=None, min_length=3, max_length=30)
-    email: EmailStr | None = None
-    password: str | None = Field(default=None, min_length=8, max_length=128)
+    username: str = Field(min_length=3, max_length=30)
+
+
+class UserUpdateEmail(BaseModel):
+    email: EmailStr
 
 
 class UserRetrievePublic(UserBase):
@@ -57,13 +59,9 @@ class UserRetrievePrivate(UserRetrievePublic):
     user_role: UserRole
 
 
-class RegistrationResponse(BaseModel):
+class VerificationRequestResponse(BaseModel):
     detail: str
     verification_link: str | None = None
-
-
-class DemoEmailRegistration(BaseModel):
-    email: EmailStr
 
 
 class ReactionBase(BaseModel):
@@ -82,7 +80,7 @@ class ReactionRetrieve(ReactionBase):
 
 
 class CommentBase(BaseModel):
-    content: str = Field(min_length=1, max_length=500)
+    content: str = Field(min_length=1, max_length=1000)
 
 
 class CommentCreate(CommentBase):
@@ -93,7 +91,7 @@ class CommentRetrieve(CommentBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    author: UserRetrievePublic
+    author: UserRetrievePublic | None
 
 
 class MediaBase(BaseModel):

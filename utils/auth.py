@@ -45,7 +45,7 @@ def create_refresh_token(
     return raw_token, token_hash, active_family_id, expires_at
 
 
-def create_registration_verification_token() -> tuple[str, str, datetime]:
+def create_verification_token() -> tuple[str, str, datetime]:
     raw_token = token_urlsafe(32)
     token_hash = hash_token(raw_token)
     expires_at = datetime.now(UTC) + timedelta(

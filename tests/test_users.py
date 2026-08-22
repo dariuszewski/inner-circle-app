@@ -7,7 +7,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
-from models import Collection, User, UserCollection
+from models import (
+    Collection,
+    User,
+    UserCollection,
+    UserRole,
+    VerificationToken,
+    VerificationTokenPurpose,
+)
 from tests.conftest import (
     auth_header,
     create_test_superuser,
@@ -423,3 +430,247 @@ async def test_verify_registration_invalid_token_returns_400(
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Invalid or expired verification link."
+
+
+@pytest.mark.anyio
+async def test_update_user(client: AsyncClient) -> None:
+    await create_test_user(client, "user", "user@example.com", "StrongPass123!")
+    token = await login_user(client, "user", "StrongPass123!")
+    headers = auth_header(token["access_token"])
+
+    await client.patch(
+        "/users/update", json={"username": "updated_user"}, headers=headers
+    )
+
+    me_response = await client.get("/users/me", headers=headers)
+
+    assert me_response.json()["username"] == "updated_user"
+
+
+@pytest.mark.anyio
+async def test_change_email_same_as_current_email(client: AsyncClient) -> None:
+    await create_test_user(
+        client, "email_user", "email_user@example.com", "StrongPass123!"
+    )
+    token = await login_user(client, "email_user", "StrongPass123!")
+    headers = auth_header(token["access_token"])
+
+    response = await client.post(
+        "/users/change-email",
+        json={"email": "email_user@example.com"},
+        headers=headers,
+    )
+
+    assert response.status_code == 400
+    assert (
+        response.json()["detail"]
+        == "New email cannot be the same as the current email."
+    )
+
+
+@pytest.mark.anyio
+async def test_change_email_happy_path(client: AsyncClient) -> None:
+    await create_test_user(
+        client, "email_user2", "email_user2@example.com", "StrongPass123!"
+    )
+    token = await login_user(client, "email_user2", "StrongPass123!")
+    headers = auth_header(token["access_token"])
+
+    response = await client.post(
+        "/users/change-email",
+        json={"email": "new_email_user2@example.com"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    verification_link = response.json()["verification_link"]
+
+    verify_response = await client.get(verification_link)
+    assert verify_response.status_code == 200
+    assert verify_response.json()["detail"] == "Email changed successfully."
+
+    me_response = await client.get("/users/me", headers=headers)
+    assert me_response.json()["email"] == "new_email_user2@example.com"
+
+
+@pytest.mark.anyio
+async def test_request_password_reset_user_not_found_returns_404(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        "/users/reset-password", json={"email": "nobody@example.com"}
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No user found with the provided email."
+
+
+@pytest.mark.anyio
+async def test_request_password_reset_happy_path(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    await create_test_user(
+        client, "reset_user", "reset_user@example.com", "StrongPass123!"
+    )
+
+    response = await client.post(
+        "/users/reset-password", json={"email": "RESET_USER@example.com"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["detail"] == "Password reset link generated."
+    assert body["verification_link"].startswith(
+        f"{settings.base_url}/users/reset-password/"
+    )
+
+    token = await db_session.scalar(
+        select(VerificationToken).where(
+            VerificationToken.purpose == VerificationTokenPurpose.PASSWORD_RESET
+        )
+    )
+    assert token is not None
+    assert token.current_email == "reset_user@example.com"
+
+
+@pytest.mark.anyio
+async def test_verify_registration_token_cannot_be_reused(
+    client: AsyncClient,
+) -> None:
+    register_response = await client.post(
+        "/users/register",
+        json={
+            "username": "verify_reuse_user",
+            "email": "verify_reuse_user@example.com",
+            "password": "StrongPass123!",
+        },
+    )
+    verification_link = register_response.json()["verification_link"]
+
+    first_verify = await client.get(verification_link)
+    assert first_verify.status_code == 200
+    assert first_verify.json()["detail"] == "Account verified successfully."
+
+    second_verify = await client.get(verification_link)
+    assert second_verify.status_code == 400
+    assert second_verify.json()["detail"] == "Invalid or expired verification link."
+
+
+@pytest.mark.anyio
+async def test_verify_demo_elevation_happy_path(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    register_response = await client.post(
+        "/users/register", json={"username": "demo_user", "password": "StrongPass123!"}
+    )
+    assert register_response.status_code == 201
+
+    token = await login_user(client, "demo_user", "StrongPass123!")
+    headers = auth_header(token["access_token"])
+
+    elevate_response = await client.patch(
+        "/users/elevate-demo",
+        json={"email": "elevated_demo_user@example.com"},
+        headers=headers,
+    )
+    assert elevate_response.status_code == 200
+    verification_link = elevate_response.json()["verification_link"]
+
+    verify_response = await client.get(verification_link)
+    assert verify_response.status_code == 200
+    assert verify_response.json()["detail"] == "Account elevated successfully."
+
+    user = await db_session.scalar(select(User).where(User.username == "demo_user"))
+    assert user is not None
+    assert user.is_verified is True
+    assert user.email == "elevated_demo_user@example.com"
+    assert user.user_role == UserRole.REGULAR
+
+
+@pytest.mark.anyio
+async def test_verify_email_change_token_cannot_be_reused(
+    client: AsyncClient,
+) -> None:
+    await create_test_user(
+        client, "email_reuse_user", "email_reuse_user@example.com", "StrongPass123!"
+    )
+    token = await login_user(client, "email_reuse_user", "StrongPass123!")
+    headers = auth_header(token["access_token"])
+
+    change_response = await client.post(
+        "/users/change-email",
+        json={"email": "new_email_reuse_user@example.com"},
+        headers=headers,
+    )
+    verification_link = change_response.json()["verification_link"]
+
+    first_verify = await client.get(verification_link)
+    assert first_verify.status_code == 200
+
+    second_verify = await client.get(verification_link)
+    assert second_verify.status_code == 400
+    assert second_verify.json()["detail"] == "Invalid or expired verification link."
+
+
+@pytest.mark.anyio
+async def test_verify_password_reset_happy_path(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    await create_test_user(
+        client, "reset_verify_user", "reset_verify_user@example.com", "StrongPass123!"
+    )
+
+    reset_response = await client.post(
+        "/users/reset-password", json={"email": "reset_verify_user@example.com"}
+    )
+    assert reset_response.status_code == 200
+
+    # the reset-password endpoint doesn't collect a new password yet, so the
+    # pending token's future_password_hash is set directly for this test
+    new_password_hash = get_password_hash("NewStrongPass456!")
+    token = await db_session.scalar(
+        select(VerificationToken).where(
+            VerificationToken.purpose == VerificationTokenPurpose.PASSWORD_RESET
+        )
+    )
+    assert token is not None
+    token.future_password_hash = new_password_hash
+    await db_session.commit()
+
+    raw_token = reset_response.json()["verification_link"].rsplit("/", 1)[-1]
+    verify_response = await client.get(f"/users/verify/{raw_token}")
+
+    assert verify_response.status_code == 200
+    assert verify_response.json()["detail"] == "Password reset successfully."
+
+    old_login = await client.post(
+        "/users/token",
+        data={"username": "reset_verify_user", "password": "StrongPass123!"},
+    )
+    assert old_login.status_code == 401
+
+    new_login = await client.post(
+        "/users/token",
+        data={"username": "reset_verify_user", "password": "NewStrongPass456!"},
+    )
+    assert new_login.status_code == 200
+
+    await db_session.refresh(token)
+    assert token.is_used is True
+    assert token.future_password_hash is None
+
+
+@pytest.mark.anyio
+async def test_refresh_invalid_token_returns_401(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        "/users/refresh",
+        json={"refresh_token": "not-a-real-refresh-token"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid refresh token."
