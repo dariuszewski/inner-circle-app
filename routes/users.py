@@ -48,9 +48,7 @@ from utils.auth import (
     hash_token,
     invalidate_refresh_token,
     invalidate_refresh_token_family,
-    is_refresh_token_family_reused,
     is_refresh_token_valid,
-    oauth2_scheme,
     verify_password,
 )
 from utils.email import send_welcome_email
@@ -339,6 +337,37 @@ async def request_password_reset(
         )
 
 
+@router.post("/account-deletion")
+async def request_account_deletion(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_active_user)],
+) -> VerificationRequestResponse:
+    user = await db.get(User, current_user.id)
+    assert user is not None
+
+    raw_token, token_hash, expires_at = create_verification_token()
+
+    token = VerificationToken(
+        user_id=current_user.id,
+        token_hash=token_hash,
+        expires_at=expires_at,
+        current_email=user.email,
+        purpose=VerificationTokenPurpose.ACCOUNT_DELETION,
+    )
+
+    db.add(token)
+    await db.commit()
+
+    verification_link = f"{settings.base_url}/users/verify/{raw_token}"
+
+    # send email here and change response
+
+    return VerificationRequestResponse(
+        detail="Verification link generated for account deletion.",
+        verification_link=verification_link,
+    )
+
+
 @router.get("/verify/{token}")
 async def verify_verification_token(
     token: str,
@@ -401,7 +430,17 @@ async def verify_verification_token(
 
         await db.commit()
         return {"detail": "Password reset successfully."}
+
+    elif verification.purpose == VerificationTokenPurpose.ACCOUNT_DELETION:
+        user = await db.get(User, verification.user_id)
+        assert user is not None
+        await db.delete(user)
+
+        verification.is_used = True
+        await db.commit()
+        return {"detail": "Account deleted successfully."}
     else:
+        # this code is unreachable in a normal app flow
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid verification purpose.",
@@ -465,12 +504,33 @@ async def refresh_access_token(
         )
 
     if not is_refresh_token_valid(refresh_token_record):
+        # a token that was rotated out (replaced_at set) but never explicitly
+        # revoked indicates someone is reusing an old, already-rotated token
+        if (
+            refresh_token_record.revoked_at is None
+            and refresh_token_record.replaced_at is not None
+        ):
+            sibling_tokens_result = await db.execute(
+                select(RefreshToken).where(
+                    RefreshToken.family_id == refresh_token_record.family_id
+                )
+            )
+            sibling_tokens = sibling_tokens_result.scalars().all()
+            invalidate_refresh_token_family(sibling_tokens)
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token reuse detected; family invalidated.",
+            )
+
+        expires_at = refresh_token_record.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        is_expired = expires_at <= datetime.now(UTC)
+
         invalidate_refresh_token(refresh_token_record)
         await db.commit()
-        if (
-            refresh_token_record.revoked_at is not None
-            and refresh_token_record.expires_at <= datetime.now(UTC)
-        ):
+        if is_expired:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Refresh token has expired.",
@@ -480,21 +540,6 @@ async def refresh_access_token(
             detail="Refresh token has been revoked.",
         )
 
-    sibling_tokens_result = await db.execute(
-        select(RefreshToken).where(
-            RefreshToken.family_id == refresh_token_record.family_id
-        )
-    )
-    sibling_tokens = sibling_tokens_result.scalars().all()
-    if is_refresh_token_family_reused(sibling_tokens, refresh_token_record.id):
-        now = datetime.now(UTC)
-        invalidate_refresh_token_family(sibling_tokens, now)
-        await db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token reuse detected; family invalidated.",
-        )
-
     user = await db.get(User, refresh_token_record.user_id)
     if user is None or not user.is_active:
         raise HTTPException(
@@ -502,7 +547,8 @@ async def refresh_access_token(
             detail="User no longer exists or is inactive.",
         )
 
-    invalidate_refresh_token(refresh_token_record)
+    # mark as rotated (not revoked) so legitimate rotation isn't mistaken for reuse
+    refresh_token_record.replaced_at = datetime.now(UTC)
 
     new_access_token = create_access_token(data={"sub": str(user.id)})
     new_refresh_token_raw, new_refresh_token_hash, family_id, new_expires_at = (
@@ -554,11 +600,6 @@ async def logout_user(
 
     await db.commit()
     return {"detail": "Refresh token revoked."}
-
-
-@router.get("/token")
-async def get_token(token: Annotated[str, Depends(oauth2_scheme)]) -> dict:
-    return {"token": token}
 
 
 @router.get("/me")

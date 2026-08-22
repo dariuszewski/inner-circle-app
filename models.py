@@ -44,6 +44,7 @@ class VerificationTokenPurpose(StrEnum):
     DEMO_USER_ELEVATION = "demo_user_elevation"
     EMAIL_CHANGE = "email_change"
     PASSWORD_RESET = "password_reset"
+    ACCOUNT_DELETION = "account_deletion"
 
 
 class User(Base):

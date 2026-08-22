@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from models import (
     Collection,
+    RefreshToken,
     User,
     UserCollection,
     UserRole,
@@ -21,7 +22,7 @@ from tests.conftest import (
     create_test_user,
     login_user,
 )
-from utils.auth import get_password_hash
+from utils.auth import get_password_hash, hash_token
 
 
 @pytest.mark.anyio
@@ -674,3 +675,359 @@ async def test_refresh_invalid_token_returns_401(
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid refresh token."
+
+
+@pytest.mark.anyio
+async def test_refresh_access_token_not_found_returns_401(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        "/users/refresh",
+        json={"refresh_token": "not-a-real-refresh-token"},
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_refresh_access_token_is_expired_returns_401(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await create_test_user(
+        client, "refresh_user", "refresh_user@example.com", "StrongPass123!"
+    )
+    tokens = await login_user(client, "refresh_user", "StrongPass123!")
+
+    refresh_token_object = await db_session.scalar(
+        select(RefreshToken).where(
+            RefreshToken.token_hash == hash_token(tokens["refresh_token"])
+        )
+    )
+    assert refresh_token_object is not None
+
+    # artificially expire the refresh token for testing
+    refresh_token_object.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+
+    await db_session.commit()
+    await db_session.refresh(refresh_token_object)
+
+    response = await client.post(
+        "/users/refresh",
+        json={"refresh_token": tokens["refresh_token"]},
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Refresh token has expired."
+
+
+@pytest.mark.anyio
+async def test_refresh_access_token_is_revoked_returns_401(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await create_test_user(
+        client, "refresh_user", "refresh_user@example.com", "StrongPass123!"
+    )
+    tokens = await login_user(client, "refresh_user", "StrongPass123!")
+
+    refresh_token_object = await db_session.scalar(
+        select(RefreshToken).where(
+            RefreshToken.token_hash == hash_token(tokens["refresh_token"])
+        )
+    )
+    assert refresh_token_object is not None
+
+    # artificially expire the refresh token for testing
+    refresh_token_object.revoked_at = datetime.now(UTC) - timedelta(minutes=1)
+
+    await db_session.commit()
+    await db_session.refresh(refresh_token_object)
+
+    response = await client.post(
+        "/users/refresh",
+        json={"refresh_token": tokens["refresh_token"]},
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Refresh token has been revoked."
+
+
+@pytest.mark.anyio
+async def test_refresh_access_family_reused_invdalidates_all_tokens(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await create_test_user(
+        client, "refresh_user", "refresh_user@example.com", "StrongPass123!"
+    )
+    tokens = await login_user(client, "refresh_user", "StrongPass123!")
+
+    # rotate the refresh token a couple of times to build up a natural token
+    # family, then reuse an already-rotated token to trigger reuse detection
+    first_refresh_token = tokens["refresh_token"]
+
+    second_response = await client.post(
+        "/users/refresh", json={"refresh_token": first_refresh_token}
+    )
+    assert second_response.status_code == 200
+    second_refresh_token = second_response.json()["refresh_token"]
+
+    third_response = await client.post(
+        "/users/refresh", json={"refresh_token": second_refresh_token}
+    )
+    assert third_response.status_code == 200
+    third_refresh_token = third_response.json()["refresh_token"]
+
+    reuse_response = await client.post(
+        "/users/refresh", json={"refresh_token": first_refresh_token}
+    )
+    assert reuse_response.status_code == 401
+    assert (
+        reuse_response.json()["detail"]
+        == "Refresh token reuse detected; family invalidated."
+    )
+
+    family_tokens_result = await db_session.execute(
+        select(RefreshToken).where(
+            RefreshToken.token_hash == hash_token(third_refresh_token)
+        )
+    )
+    third_token_record = family_tokens_result.scalar_one()
+
+    family_tokens_result = await db_session.execute(
+        select(RefreshToken).where(
+            RefreshToken.family_id == third_token_record.family_id
+        )
+    )
+    family_tokens = family_tokens_result.scalars().all()
+    assert len(family_tokens) == 3
+    assert all(token.revoked_at is not None for token in family_tokens)
+
+    # the previously valid third token should now be rejected too
+    blocked_response = await client.post(
+        "/users/refresh", json={"refresh_token": third_refresh_token}
+    )
+    assert blocked_response.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_refresh_access_token_deleted_user_returns_401(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user = await create_test_user(
+        client, "deleted_user", "deleted_user@example.com", "StrongPass123!"
+    )
+    tokens = await login_user(client, "deleted_user", "StrongPass123!")
+
+    # SQLite foreign keys aren't enforced in tests, so deleting the user
+    # leaves the refresh token behind, simulating a truly deleted account
+    user_record = await db_session.get(User, user["id"])
+    assert user_record is not None
+    await db_session.delete(user_record)
+    await db_session.commit()
+
+    response = await client.post(
+        "/users/refresh",
+        json={"refresh_token": tokens["refresh_token"]},
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "User no longer exists or is inactive."
+
+
+@pytest.mark.anyio
+async def test_logout_unknown_refresh_token_returns_already_invalid_message(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        "/users/logout",
+        json={
+            "refresh_token": "not-a-real-refresh-token",
+            "all_sessions": False,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["detail"] == "Refresh token already invalid or not found."
+
+
+@pytest.mark.anyio
+async def test_logout_revokes_single_refresh_token(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    await create_test_user(
+        client,
+        "logout_user",
+        "logout_user@example.com",
+        "StrongPass123!",
+    )
+
+    tokens = await login_user(
+        client,
+        "logout_user",
+        "StrongPass123!",
+    )
+
+    refresh_token_raw = tokens["refresh_token"]
+
+    refresh_token_record = await db_session.scalar(
+        select(RefreshToken).where(
+            RefreshToken.token_hash == hash_token(refresh_token_raw)
+        )
+    )
+
+    assert refresh_token_record is not None
+    assert refresh_token_record.revoked_at is None
+
+    response = await client.post(
+        "/users/logout",
+        json={
+            "refresh_token": refresh_token_raw,
+            "all_sessions": False,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["detail"] == "Refresh token revoked."
+
+    await db_session.refresh(refresh_token_record)
+
+    assert refresh_token_record.revoked_at is not None
+
+
+@pytest.mark.anyio
+async def test_logout_all_sessions_revokes_refresh_token_family(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    await create_test_user(
+        client,
+        "family_logout_user",
+        "family_logout_user@example.com",
+        "StrongPass123!",
+    )
+
+    tokens = await login_user(
+        client,
+        "family_logout_user",
+        "StrongPass123!",
+    )
+
+    first_refresh_token = tokens["refresh_token"]
+
+    refresh_response = await client.post(
+        "/users/refresh",
+        json={"refresh_token": first_refresh_token},
+    )
+
+    assert refresh_response.status_code == 200
+
+    second_refresh_token = refresh_response.json()["refresh_token"]
+
+    second_token_record = await db_session.scalar(
+        select(RefreshToken).where(
+            RefreshToken.token_hash == hash_token(second_refresh_token)
+        )
+    )
+
+    assert second_token_record is not None
+
+    family_id = second_token_record.family_id
+
+    family_tokens_before = (
+        (
+            await db_session.execute(
+                select(RefreshToken).where(RefreshToken.family_id == family_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    assert len(family_tokens_before) == 2
+
+    response = await client.post(
+        "/users/logout",
+        json={
+            "refresh_token": second_refresh_token,
+            "all_sessions": True,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["detail"] == "Refresh token revoked."
+
+    family_tokens_after = (
+        (
+            await db_session.execute(
+                select(RefreshToken).where(RefreshToken.family_id == family_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    assert len(family_tokens_after) == 2
+    assert all(token.revoked_at is not None for token in family_tokens_after)
+
+
+@pytest.mark.anyio
+async def test_account_deletion_happy_path(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    user = await create_test_user(
+        client, "deletion_user", "deletion_user@example.com", "StrongPass123!"
+    )
+    token = await login_user(client, "deletion_user", "StrongPass123!")
+    headers = auth_header(token["access_token"])
+
+    response = await client.post("/users/account-deletion", headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["detail"] == "Verification link generated for account deletion."
+    verification_link = body["verification_link"]
+
+    verify_response = await client.get(verification_link)
+    assert verify_response.status_code == 200
+    assert verify_response.json()["detail"] == "Account deleted successfully."
+
+    deleted_user = await db_session.get(User, user["id"])
+    assert deleted_user is None
+
+    login_response = await client.post(
+        "/users/token",
+        data={"username": "deletion_user", "password": "StrongPass123!"},
+    )
+    assert login_response.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_account_deletion_requires_authentication(
+    client: AsyncClient,
+) -> None:
+    response = await client.post("/users/account-deletion")
+
+    assert response.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_verify_account_deletion_token_cannot_be_reused(
+    client: AsyncClient,
+) -> None:
+    await create_test_user(
+        client,
+        "deletion_reuse_user",
+        "deletion_reuse_user@example.com",
+        "StrongPass123!",
+    )
+    token = await login_user(client, "deletion_reuse_user", "StrongPass123!")
+    headers = auth_header(token["access_token"])
+
+    delete_response = await client.post("/users/account-deletion", headers=headers)
+    verification_link = delete_response.json()["verification_link"]
+
+    first_verify = await client.get(verification_link)
+    assert first_verify.status_code == 200
+    assert first_verify.json()["detail"] == "Account deleted successfully."
+
+    second_verify = await client.get(verification_link)
+    assert second_verify.status_code == 400
+    assert second_verify.json()["detail"] == "Invalid or expired verification link."
