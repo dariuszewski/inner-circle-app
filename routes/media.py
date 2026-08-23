@@ -65,7 +65,7 @@ async def get_media(
 
     if media is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Media not found or access denied.",
         )
     return MediaRetrieveDetailed.model_validate(media)
@@ -159,7 +159,7 @@ async def delete_media(
 
     if media is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Media not found or access denied.",
         )
 
