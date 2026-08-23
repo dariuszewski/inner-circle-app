@@ -1,8 +1,9 @@
 from datetime import UTC, datetime
+from math import ceil
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -11,6 +12,7 @@ from models import (
     Collection,
     CollectionInvitation,
     Media,
+    User,
     UserCollection,
     UserCollectionRole,
 )
@@ -37,7 +39,15 @@ router = APIRouter(
 async def get_collections(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
-) -> list[CollectionRetrieve]:
+    collection_name: Annotated[
+        str | None, Query(description="Filter collections by name")
+    ] = None,
+    collection_member: Annotated[
+        str | None, Query(description="Filter collections by member username")
+    ] = None,
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    per_page: Annotated[int, Query(ge=1, le=50, description="Items per page")] = 2,
+) -> PaginatedResponse[CollectionRetrieve]:
 
     stmt = (
         select(Collection)
@@ -50,9 +60,37 @@ async def get_collections(
         )
         .options(selectinload(Collection.cover_image).selectinload(Media.uploaded_by))
     )
-    collections = await db.scalars(stmt)
+    if collection_name:
+        stmt = stmt.where(Collection.name.ilike(f"%{collection_name}%"))
+    if collection_member:
+        stmt = stmt.where(
+            Collection.id.in_(
+                select(UserCollection.collection_id).where(
+                    UserCollection.user.has(
+                        User.username.ilike(f"%{collection_member}%")
+                    )
+                )
+            )
+        )
 
-    return [CollectionRetrieve.model_validate(collection) for collection in collections]
+    total_items = (
+        await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    )
+
+    query = await db.execute(stmt.offset((page - 1) * per_page).limit(per_page))
+    collections = query.scalars().all()
+
+    response = PaginatedResponse[CollectionRetrieve](
+        total_items=total_items,
+        page=page,
+        per_page=per_page,
+        total_pages=ceil(total_items / per_page) if total_items else 0,
+        items=[
+            CollectionRetrieve.model_validate(collection) for collection in collections
+        ],
+    )
+
+    return response
 
 
 @router.get("/{collection_id}")
@@ -128,7 +166,11 @@ async def get_collection(
         created_at=collection.created_at,
         created_by_id=collection.created_by_id,
         created_by=created_by,
-        cover_image=MediaRetrieve.model_validate(collection.cover_image),
+        cover_image=(
+            MediaRetrieve.model_validate(collection.cover_image)
+            if collection.cover_image
+            else None
+        ),
         members_count=len(members),
         members=members,
         total_items=paginated_media.total_items,

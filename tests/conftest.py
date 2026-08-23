@@ -16,7 +16,7 @@ from sqlalchemy.pool import NullPool
 
 from database import get_db
 from main import app
-from models import Base, User, UserRole
+from models import Base, User, UserCollection, UserRole
 from utils.auth import get_password_hash
 
 pytest_plugins = ["anyio"]
@@ -160,3 +160,24 @@ async def login_user(
 
 def auth_header(access_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {access_token}"}
+
+
+async def create_test_collection(
+    db_session: AsyncSession, user_id: int, name: str = "Test Collection"
+) -> Any:
+    from models import Collection
+
+    collection = Collection(name=name, created_by_id=user_id)
+    db_session.add(collection)
+    await db_session.commit()
+    await db_session.refresh(collection)
+    return collection
+
+
+async def add_user_to_collection_members(
+    db_session: AsyncSession, user_id: int, collection_id: int
+) -> None:
+
+    user_collection = UserCollection(user_id=user_id, collection_id=collection_id)
+    db_session.add(user_collection)
+    await db_session.commit()
