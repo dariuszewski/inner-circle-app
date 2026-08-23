@@ -173,11 +173,11 @@ async def get_collection(
         ),
         members_count=len(members),
         members=members,
+        media=paginated_media.items,
         total_items=paginated_media.total_items,
         page=paginated_media.page,
         per_page=paginated_media.per_page,
         total_pages=paginated_media.total_pages,
-        media=paginated_media.items,
     )
 
 
@@ -245,7 +245,7 @@ async def update_collection(
     return CollectionRetrieve.model_validate(collection)
 
 
-@router.post("/invitation/{collection_id}", status_code=status.HTTP_201_CREATED)
+@router.post("/create-invitation/{collection_id}", status_code=status.HTTP_201_CREATED)
 async def post_create_invitation(
     collection_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -311,3 +311,29 @@ async def accept_invitation(
     await db.refresh(user_collection)
 
     return {"message": "Invitation accepted successfully."}
+
+
+@router.delete("/leave-collection/{collection_id}", status_code=status.HTTP_200_OK)
+async def leave_collection(
+    collection_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
+) -> dict[str, str]:
+
+    stmt = select(UserCollection).where(
+        UserCollection.collection_id == collection_id,
+        UserCollection.user_id == current_user.id,
+    )
+    result = await db.execute(stmt)
+    user_collection = result.scalar_one_or_none()
+
+    if user_collection is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Collection not found or access denied.",
+        )
+
+    await db.delete(user_collection)
+    await db.commit()
+
+    return {"message": "Successfully left the collection."}
