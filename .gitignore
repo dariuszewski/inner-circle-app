@@ -18,6 +18,7 @@ wheels/
 # Development 
 uploads/
 .env
+prod.env
 requests.log
 dev.db
 test.db

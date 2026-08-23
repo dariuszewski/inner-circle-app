@@ -2,6 +2,9 @@
 
 A FastAPI-based application for managing collections, users, media uploads, comments, and reactions.
 
+## DEMO
+https://inner-circle-app-967d77e2.fastapicloud.dev/docs
+
 ## Features
 
 - User registration and authentication
