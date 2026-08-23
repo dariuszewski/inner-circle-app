@@ -7,7 +7,6 @@ from fastapi import (
     Depends,
     File,
     HTTPException,
-    Query,
     UploadFile,
     status,
 )
@@ -26,7 +25,7 @@ from models import (
     User,
     UserCollection,
 )
-from schemas import MediaRetrieve, MediaRetrieveDetailed, ReactionCreate
+from schemas import CommentCreate, MediaRetrieve, MediaRetrieveDetailed, ReactionCreate
 from utils.auth import get_current_user
 from utils.media import get_media_type, upload_file
 
@@ -180,7 +179,7 @@ async def delete_media(
 @router.post("/comment/{media_id}", status_code=status.HTTP_201_CREATED)
 async def comment_media(
     media_id: int,
-    comment: str,
+    comment_data: CommentCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> None:
@@ -200,27 +199,58 @@ async def comment_media(
 
     if media is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Media not found or access denied.",
         )
 
     comment_obj = Comment(
         media_id=media_id,
         author_id=current_user.id,
-        content=comment,
+        content=comment_data.content,
     )
 
     db.add(comment_obj)
     await db.commit()
 
 
+@router.delete("/comment/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_comment(
+    comment_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    stmt = (
+        select(Comment)
+        .join(
+            Media,
+            Media.id == Comment.media_id,
+        )
+        .join(
+            UserCollection,
+            UserCollection.collection_id == Media.collection_id,
+        )
+        .where(
+            Comment.id == comment_id,
+            UserCollection.user_id == current_user.id,
+        )
+    )
+
+    comment = await db.scalar(stmt)
+
+    if comment is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Comment not found or access denied.",
+        )
+
+    await db.delete(comment)
+    await db.commit()
+
+
 @router.post("/react/{media_id}", status_code=status.HTTP_201_CREATED)
 async def react_to_media(
     media_id: int,
-    reaction_data: Annotated[
-        ReactionCreate,
-        Query(description="The type of reaction to add"),
-    ],
+    reaction_data: ReactionCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> None:
@@ -240,7 +270,7 @@ async def react_to_media(
 
     if media is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Media not found or access denied.",
         )
 
@@ -251,4 +281,39 @@ async def react_to_media(
     )
 
     db.add(reaction_obj)
+    await db.commit()
+
+
+@router.delete("/react/{media_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_reaction_from_media(
+    media_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    stmt = (
+        select(Reaction)
+        .join(
+            Media,
+            Media.id == Reaction.media_id,
+        )
+        .join(
+            UserCollection,
+            UserCollection.collection_id == Media.collection_id,
+        )
+        .where(
+            Reaction.media_id == media_id,
+            Reaction.user_id == current_user.id,
+            UserCollection.user_id == current_user.id,
+        )
+    )
+
+    reaction = await db.scalar(stmt)
+
+    if reaction is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reaction not found or access denied.",
+        )
+
+    await db.delete(reaction)
     await db.commit()
