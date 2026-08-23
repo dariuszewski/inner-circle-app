@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
-    registration_verification_expire_hours: int = 24
+    verification_token_expire_hours: int = 24
 
     # Database settings
     database_url: str = "sqlite+aiosqlite:///./dev.db"
@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     upload_directory: str = "uploads"
     uploads_mount_path: str = "/uploads"
     base_url: str = "http://localhost:8000"
+    max_upload_size_bytes: int = 10485760
+    max_data_storage_per_user_bytes: int = 1073741824
 
     # Logs settings
     log_file: str | None = "requests.log"

@@ -2,6 +2,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
 from tests.conftest import auth_header, create_test_user, login_user
 
 
@@ -68,6 +69,78 @@ async def test_upload_and_retrieve_media(
     # Assert 400 if user tries to delete media they don't have access to
     bad_delete_response = await client.delete("/media/9999", headers=headers)
     assert bad_delete_response.status_code == 400
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_file_over_maximum_size(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "max_upload_size_bytes", 5)
+
+    user = await create_test_user(
+        client,
+        username="oversized_user",
+        email="oversized_user@example.com",
+        password="StrongPass123!",
+    )
+    token = await login_user(client, user["username"], "StrongPass123!")
+    headers = auth_header(token["access_token"])
+
+    collection_response = await client.post(
+        "/collections",
+        json={"name": "Size Test Collection"},
+        headers=headers,
+    )
+
+    media_response = await client.post(
+        "/media",
+        params={"collection_id": collection_response.json()["id"]},
+        files=[("files", ("large.jpg", b"123456", "image/jpeg"))],
+        headers=headers,
+    )
+
+    assert media_response.status_code == 413
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_user_storage_limit(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "max_upload_size_bytes", 10)
+    monkeypatch.setattr(settings, "max_data_storage_per_user_bytes", 5)
+
+    user = await create_test_user(
+        client,
+        username="storage_limit_user",
+        email="storage_limit_user@example.com",
+        password="StrongPass123!",
+    )
+    token = await login_user(client, user["username"], "StrongPass123!")
+    headers = auth_header(token["access_token"])
+
+    collection_response = await client.post(
+        "/collections",
+        json={"name": "Storage Test Collection"},
+        headers=headers,
+    )
+    collection_id = collection_response.json()["id"]
+
+    first_upload = await client.post(
+        "/media",
+        params={"collection_id": collection_id},
+        files=[("files", ("first.jpg", b"1234", "image/jpeg"))],
+        headers=headers,
+    )
+    assert first_upload.status_code == 201
+
+    second_upload = await client.post(
+        "/media",
+        params={"collection_id": collection_id},
+        files=[("files", ("second.jpg", b"12", "image/jpeg"))],
+        headers=headers,
+    )
+
+    assert second_upload.status_code == 413
 
 
 @pytest.mark.anyio

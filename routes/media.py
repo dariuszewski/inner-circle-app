@@ -11,7 +11,7 @@ from fastapi import (
     status,
 )
 from pydantic import WithJsonSchema
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -27,7 +27,7 @@ from models import (
 )
 from schemas import CommentCreate, MediaRetrieve, MediaRetrieveDetailed, ReactionCreate
 from utils.auth import get_current_user
-from utils.media import get_media_type, upload_file
+from utils.media import get_media_type, get_upload_file_size, upload_file
 
 router = APIRouter(
     prefix="/media",
@@ -107,8 +107,45 @@ async def upload_media(
             detail="Collection not found or user does not have access to it",
         )
 
-    media_objs = []
+    file_sizes = []
     for file in files:
+        file_size = file.size
+        if file_size is None:
+            file_size = await get_upload_file_size(file)
+        file_sizes.append(file_size)
+
+    oversized_file = next(
+        (size for size in file_sizes if size > settings.max_upload_size_bytes),
+        None,
+    )
+    if oversized_file is not None:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=(
+                f"Each file must be no larger than "
+                f"{settings.max_upload_size_bytes} bytes."
+            ),
+        )
+
+    current_storage: int = await db.scalar(
+        select(func.coalesce(func.sum(Media.file_size), 0)).where(
+            Media.uploaded_by_id == current_user.id
+        )
+    )
+    if current_storage is None:
+        current_storage = 0
+    requested_storage = sum(file_sizes) or 0
+    if current_storage + requested_storage > settings.max_data_storage_per_user_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=(
+                "The upload would exceed your maximum data storage limit of "
+                f"{settings.max_data_storage_per_user_bytes} bytes."
+            ),
+        )
+
+    media_objs = []
+    for file, file_size in zip(files, file_sizes, strict=True):
         media_type = await get_media_type(file.content_type)
 
         extension = pathlib.Path(file.filename or "").suffix.lower()
@@ -120,6 +157,7 @@ async def upload_media(
 
         media_obj = Media(
             file_path=file_name,
+            file_size=file_size,
             media_type=media_type,
             uploaded_by_id=current_user.id,
             collection_id=collection_id,

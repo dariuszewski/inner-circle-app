@@ -49,7 +49,7 @@ def create_verification_token() -> tuple[str, str, datetime]:
     raw_token = token_urlsafe(32)
     token_hash = hash_token(raw_token)
     expires_at = datetime.now(UTC) + timedelta(
-        hours=settings.registration_verification_expire_hours
+        hours=settings.verification_token_expire_hours
     )
     return raw_token, token_hash, expires_at
 
