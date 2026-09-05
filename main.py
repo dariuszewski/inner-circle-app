@@ -1,11 +1,9 @@
-import asyncio
 import pathlib
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
-from alembic.config import Config as AlembicConfig
 from fastapi import (
     FastAPI,
     Header,
@@ -14,9 +12,9 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from alembic import command
 from config import settings
 from database import AsyncSessionLocal, engine
+from models import Base
 from routes.collections import router as collection_router
 from routes.media import router as media_router
 from routes.users import router as user_router
@@ -26,16 +24,10 @@ from utils.logging_config import logger, request_id_context
 pathlib.Path(settings.upload_directory).mkdir(exist_ok=True)
 
 
-def run_migrations() -> None:
-    # this is a workaround for fastapi cloud
-    alembic_cfg = AlembicConfig("alembic.ini")
-    command.upgrade(alembic_cfg, "head")
-
-
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-
-    await asyncio.to_thread(run_migrations)
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
 
     async with AsyncSessionLocal.begin() as db:
         await ensure_superuser(db)

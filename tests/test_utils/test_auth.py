@@ -272,6 +272,7 @@ def test_get_current_user_success() -> None:
         email="testuser@example.com",
         hashed_password="hashed-password",
         created_at=datetime.now(UTC),
+        is_active=True,
         is_verified=True,
         user_role=UserRole.REGULAR,
     )

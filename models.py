@@ -74,6 +74,10 @@ class User(Base):
         nullable=False,
         default=lambda: datetime.now(UTC),
     )
+    is_active: Mapped[bool] = mapped_column(
+        default=True,
+        nullable=False,
+    )
     is_verified: Mapped[bool] = mapped_column(
         default=False,
         nullable=False,
