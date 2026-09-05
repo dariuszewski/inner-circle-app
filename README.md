@@ -5,6 +5,75 @@ A FastAPI-based application for managing collections, users, media uploads, comm
 ## DEMO
 https://inner-circle-app-967d77e2.fastapicloud.dev/docs
 
+## Run Locally
+
+Prerequisites:
+
+- Python 3.14+
+- [uv](https://docs.astral.sh/uv/)
+- Docker Desktop
+
+1. Clone the repository and enter the project directory:
+   ```bash
+   git clone <repository-url>
+   cd inner-circle-app
+   ```
+
+2. Create a local `.env` file. Use the PostgreSQL connection string from
+   `docker-compose.yml`, not a production database:
+   ```dotenv
+   DATABASE_URL=postgresql+asyncpg://ic_user:ic_password@localhost:5432/ic_db
+   CREATE_SUPERUSER_ON_STARTUP=true
+   SUPERUSER_USERNAME=admin
+   SUPERUSER_EMAIL=admin@example.com
+   SUPERUSER_PASSWORD=change-me
+   ```
+
+3. Install the project and development dependencies:
+   ```bash
+   uv sync
+   ```
+
+4. Start PostgreSQL:
+   ```bash
+   docker compose up -d
+   ```
+
+5. Apply the database migrations:
+   ```bash
+   uv run alembic upgrade head
+   ```
+
+6. Start the development server:
+   ```bash
+   uv run fastapi dev
+   ```
+
+## Updating the Database Schema
+
+When changing SQLAlchemy models:
+
+1. Update the models in `models.py`.
+2. Start the database if it is not already running:
+   ```bash
+   docker compose up -d
+   ```
+3. Generate a migration with a descriptive message:
+   ```bash
+   uv run alembic revision --autogenerate -m "describe the schema change"
+   ```
+4. Review the generated file in `alembic/versions/` and adjust it if needed.
+5. Apply the migration locally:
+   ```bash
+   uv run alembic upgrade head
+   ```
+
+Commit the reviewed migration file with the model changes. Do not use
+`Base.metadata.create_all()` for schema updates. In production, run
+`uv run alembic upgrade head` against the production database before starting
+the updated application.
+
+
 ## Features
 
 - User registration and authentication
@@ -16,7 +85,7 @@ https://inner-circle-app-967d77e2.fastapicloud.dev/docs
 
 ## Tech Stack
 
-- Python 3.12+
+- Python 3.14+
 - FastAPI
 - SQLAlchemy
 - Pydantic
@@ -37,7 +106,8 @@ https://inner-circle-app-967d77e2.fastapicloud.dev/docs
 
 ## Setup
 
-1. Create and activate a virtual environment:
+1. Create and activate a virtual environment (optional; `uv run` manages the
+   project environment automatically):
    ```bash
    uv venv
    source .venv/bin/activate
@@ -69,7 +139,7 @@ The app uses the following environment variables for the initial superuser:
 Example `.env` file for local development:
 
 ```dotenv
-SECRET_KEY="secretkey"
+SECRET_KEY="replace-with-a-long-random-secret"
 ALGORITHM="HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 SUPERUSER_USERNAME="admin"
@@ -102,4 +172,5 @@ uv run mypy
 
 ## Notes
 
-The application stores uploaded files in the `uploads/` directory and uses a SQLite database file by default.
+The local setup uses PostgreSQL through Docker. Uploaded files are stored in
+the `uploads/` directory.

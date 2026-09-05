@@ -28,7 +28,6 @@ async def ensure_superuser(db: AsyncSession) -> None:
             username=settings.superuser_username,
             email=settings.superuser_email,
             hashed_password=get_password_hash(settings.superuser_password),
-            is_active=True,
             is_verified=True,
             user_role=UserRole.ADMIN,
         )

@@ -541,10 +541,10 @@ async def refresh_access_token(
         )
 
     user = await db.get(User, refresh_token_record.user_id)
-    if user is None or not user.is_active:
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User no longer exists or is inactive.",
+            detail="User no longer exists.",
         )
 
     # mark as rotated (not revoked) so legitimate rotation isn't mistaken for reuse

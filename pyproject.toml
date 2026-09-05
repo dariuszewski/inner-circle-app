@@ -6,6 +6,8 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "aiosqlite>=0.22.1",
+    "alembic>=1.19.2",
+    "asyncpg>=0.31.0",
     "email-validator>=2.3.0",
     "fastapi[standard]>=0.139.2",
     "pwdlib[argon2]>=0.3.0",
@@ -19,6 +21,7 @@ dependencies = [
 [tool.ruff]
 line-length = 88
 target-version = "py312"
+exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = [

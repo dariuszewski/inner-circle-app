@@ -827,7 +827,7 @@ async def test_refresh_access_token_deleted_user_returns_401(
         json={"refresh_token": tokens["refresh_token"]},
     )
     assert response.status_code == 401
-    assert response.json()["detail"] == "User no longer exists or is inactive."
+    assert response.json()["detail"] == "User no longer exists."
 
 
 @pytest.mark.anyio

@@ -54,7 +54,6 @@ class UserRetrievePublic(UserBase):
 
 class UserRetrievePrivate(UserRetrievePublic):
     email: EmailStr
-    is_active: bool
     is_verified: bool
     user_role: UserRole
 
