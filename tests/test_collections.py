@@ -40,9 +40,11 @@ async def test_get_collections_and_filters(
 
     # Create collections by active user
     collection1 = await client.post(
-        "/collections", json={"name": "1st Collection"}, headers=headers
+        "/api/collections", json={"name": "1st Collection"}, headers=headers
     )
-    await client.post("/collections", json={"name": "2nd Collection"}, headers=headers)
+    await client.post(
+        "/api/collections", json={"name": "2nd Collection"}, headers=headers
+    )
 
     # Add the passive user to collection1
     await add_user_to_collection_members(
@@ -50,19 +52,19 @@ async def test_get_collections_and_filters(
     )
 
     # Assert that the active user can retrieve all collections
-    response = await client.get("/collections", headers=headers)
+    response = await client.get("/api/collections", headers=headers)
     assert response.status_code == 200
     assert len(response.json()["items"]) == 2
     assert response.json()["total_items"] == 2
 
     # Assert that the active user can filter collections by name
-    response = await client.get("/collections?collection_name=1st", headers=headers)
+    response = await client.get("/api/collections?collection_name=1st", headers=headers)
     assert len(response.json()["items"]) == 1
     assert response.json()["total_items"] == 1
 
     # Assert that the active user can filter collections by member username
     response = await client.get(
-        "/collections?collection_member=passive", headers=headers
+        "/api/collections?collection_member=passive", headers=headers
     )
     print(response.json())
     assert len(response.json()["items"]) == 1
@@ -70,7 +72,8 @@ async def test_get_collections_and_filters(
 
     # Assert that the active user can filter collections by name and member username
     response = await client.get(
-        "/collections?collection_name=1st&collection_member=passive", headers=headers
+        "/api/collections?collection_name=1st&collection_member=passive",
+        headers=headers,
     )
     assert len(response.json()["items"]) == 1
     assert response.json()["total_items"] == 1
@@ -91,14 +94,14 @@ async def test_create_collection(client: AsyncClient) -> None:
 
     # Create a collection
     response = await client.post(
-        "/collections", json={"name": "Test Collection"}, headers=headers
+        "/api/collections", json={"name": "Test Collection"}, headers=headers
     )
     assert response.status_code == 201
     assert response.json()["name"] == "Test Collection"
 
     # assert collection is retrieved by id
     collection_id = response.json()["id"]
-    response = await client.get(f"/collections/{collection_id}", headers=headers)
+    response = await client.get(f"/api/collections/{collection_id}", headers=headers)
     assert response.status_code == 200
     assert response.json()["name"] == "Test Collection"
 
@@ -128,12 +131,12 @@ async def test_get_detailed_collection(
 
     # Create a collection by active user
     collection_response = await client.post(
-        "/collections", json={"name": "Test Collection"}, headers=headers
+        "/api/collections", json={"name": "Test Collection"}, headers=headers
     )
 
     # Create media mocks
     media_response = await client.post(
-        "/media",
+        "/api/media",
         params={"collection_id": collection_response.json()["id"]},
         files=[
             ("files", ("photo1.jpg", b"fake-image-data", "image/jpeg")),
@@ -145,7 +148,7 @@ async def test_get_detailed_collection(
     # Set the cover image for the collection
     media_id = media_response.json()[0]["id"]
     await client.put(
-        f"/collections/{collection_response.json()['id']}",
+        f"/api/collections/{collection_response.json()['id']}",
         json={"cover_image_id": media_id},
         headers=headers,
     )
@@ -157,7 +160,7 @@ async def test_get_detailed_collection(
 
     # get collection by id and assert the details
     response = await client.get(
-        f"/collections/{collection_response.json()['id']}", headers=headers
+        f"/api/collections/{collection_response.json()['id']}", headers=headers
     )
     assert response.status_code == 200
 
@@ -171,7 +174,7 @@ async def test_get_detailed_collection(
 
     # Assert that pagination works correctly
     response = await client.get(
-        f"/collections/{collection_response.json()['id']}?page=1&per_page=1",
+        f"/api/collections/{collection_response.json()['id']}?page=1&per_page=1",
         headers=headers,
     )
     assert response.status_code == 200
@@ -180,7 +183,7 @@ async def test_get_detailed_collection(
 
     # Assert that the second page returns the second media item
     response = await client.get(
-        f"/collections/{collection_response.json()['id']}?page=2&per_page=1",
+        f"/api/collections/{collection_response.json()['id']}?page=2&per_page=1",
         headers=headers,
     )
     assert response.status_code == 200
@@ -188,19 +191,19 @@ async def test_get_detailed_collection(
 
     # Assert that requesting a page beyond the available pages returns an empty list
     response = await client.get(
-        f"/collections/{collection_response.json()['id']}?page=3&per_page=1",
+        f"/api/collections/{collection_response.json()['id']}?page=3&per_page=1",
         headers=headers,
     )
     assert response.status_code == 200
     assert len(response.json()["media"]) == 0
 
     # Assert that requesting bad collection returns 400
-    response = await client.get("/collections/9999", headers=headers)
+    response = await client.get("/api/collections/9999", headers=headers)
     assert response.status_code == 400
 
     # Assert that updating bad collection returns 400
     response = await client.put(
-        "/collections/9999", json={"name": "Updated Name"}, headers=headers
+        "/api/collections/9999", json={"name": "Updated Name"}, headers=headers
     )
     assert response.status_code == 400
 
@@ -230,12 +233,12 @@ async def test_invitation_acceptance_leave_collection(
 
     # Create a collection by active user
     collection_response = await client.post(
-        "/collections", json={"name": "Test Collection"}, headers=headers
+        "/api/collections", json={"name": "Test Collection"}, headers=headers
     )
 
     # Create invitation for the passive user
     invitation_response = await client.post(
-        f"/collections/create-invitation/{collection_response.json()['id']}",
+        f"/api/collections/create-invitation/{collection_response.json()['id']}",
         headers=headers,
     )
 
@@ -245,7 +248,7 @@ async def test_invitation_acceptance_leave_collection(
 
     # Accept the invitation
     response = await client.put(
-        f"/collections/accept-invitation/{
+        f"/api/collections/accept-invitation/{
             invitation_response.json()['invitation_token']
         }",
         headers=headers,
@@ -255,41 +258,41 @@ async def test_invitation_acceptance_leave_collection(
 
     # Assert that the passive user is now a member of the collection
     response = await client.get(
-        f"/collections/{collection_response.json()['id']}", headers=headers
+        f"/api/collections/{collection_response.json()['id']}", headers=headers
     )
     assert response.status_code == 200
     assert len(response.json()["members"]) == 2
 
     # Assert that the passive user can create an invitation link
     response = await client.post(
-        f"/collections/create-invitation/{collection_response.json()['id']}",
+        f"/api/collections/create-invitation/{collection_response.json()['id']}",
         headers=headers,
     )
     assert response.status_code == 201
 
     # Leave the collection
     response = await client.delete(
-        f"/collections/leave-collection/{collection_response.json()['id']}",
+        f"/api/collections/leave-collection/{collection_response.json()['id']}",
         headers=headers,
     )
     assert response.status_code == 200
 
     # Assert that the passive user is no longer a member of the collection
     response = await client.get(
-        f"/collections/{collection_response.json()['id']}", headers=headers
+        f"/api/collections/{collection_response.json()['id']}", headers=headers
     )
     assert response.status_code == 400
 
     # Assert that the passive user cannot leave the collection again
     response = await client.delete(
-        f"/collections/leave-collection/{collection_response.json()['id']}",
+        f"/api/collections/leave-collection/{collection_response.json()['id']}",
         headers=headers,
     )
     assert response.status_code == 400
 
     # Assert that the passive user cannot create an invitation link after leaving
     response = await client.post(
-        f"/collections/create-invitation/{collection_response.json()['id']}",
+        f"/api/collections/create-invitation/{collection_response.json()['id']}",
         headers=headers,
     )
     assert response.status_code == 400
@@ -320,12 +323,12 @@ async def test_expired_invitation_link(
 
     # Create a collection by active user
     collection_response = await client.post(
-        "/collections", json={"name": "Test Collection"}, headers=headers
+        "/api/collections", json={"name": "Test Collection"}, headers=headers
     )
 
     # Create invitation for the passive user
     invitation_response = await client.post(
-        f"/collections/create-invitation/{collection_response.json()['id']}",
+        f"/api/collections/create-invitation/{collection_response.json()['id']}",
         headers=headers,
     )
 
@@ -347,7 +350,7 @@ async def test_expired_invitation_link(
 
     # Attempt to accept the expired invitation
     response = await client.put(
-        f"/collections/accept-invitation/{
+        f"/api/collections/accept-invitation/{
             invitation_response.json()['invitation_token']
         }",
         headers=headers,

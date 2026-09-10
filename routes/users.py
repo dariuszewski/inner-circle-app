@@ -183,7 +183,7 @@ async def create_user(
     await db.commit()
 
     # no email infra yet, so the verification link is returned directly instead of sent
-    verification_link = f"{settings.base_url}/users/verify/{raw_token}"
+    verification_link = f"{settings.base_url}/api/users/verify/{raw_token}"
     # start a background task to send a welcome email to the new user
     background_tasks.add_task(send_welcome_email, new_user.email, new_user.username)
 
@@ -228,7 +228,7 @@ async def register_demo_user_as_regular(
     )
     await db.commit()
 
-    verification_link = f"{settings.base_url}/users/verify/{raw_token}"
+    verification_link = f"{settings.base_url}/api/users/verify/{raw_token}"
 
     background_tasks.add_task(send_welcome_email, future_email, current_user.username)
 
@@ -288,7 +288,7 @@ async def change_user_email(
     db.add(token)
     await db.commit()
 
-    verification_link = f"{settings.base_url}/users/verify/{raw_token}"
+    verification_link = f"{settings.base_url}/api/users/verify/{raw_token}"
 
     # send email here and change response
 
@@ -321,7 +321,7 @@ async def request_password_reset(
         db.add(token)
         await db.commit()
 
-        verification_link = f"{settings.base_url}/users/reset-password/{raw_token}"
+        verification_link = f"{settings.base_url}/api/users/reset-password/{raw_token}"
 
         # send email here and change response
 
@@ -358,7 +358,7 @@ async def request_account_deletion(
     db.add(token)
     await db.commit()
 
-    verification_link = f"{settings.base_url}/users/verify/{raw_token}"
+    verification_link = f"{settings.base_url}/api/users/verify/{raw_token}"
 
     # send email here and change response
 

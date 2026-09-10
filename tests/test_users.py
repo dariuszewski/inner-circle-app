@@ -61,7 +61,7 @@ async def test_get_users_responses(
         token = await login_user(client, username, password)
         headers = auth_header(token["access_token"])
 
-    response = await client.get("/users", headers=headers)
+    response = await client.get("/api/users", headers=headers)
 
     assert response.status_code == expected_status
 
@@ -95,7 +95,7 @@ async def test_get_users_regular_user_only_sees_shared_collection_members(
     token = await login_user(client, "user_a", "StrongPass123!")
     headers = auth_header(token["access_token"])
 
-    response = await client.get("/users", headers=headers)
+    response = await client.get("/api/users", headers=headers)
 
     assert response.status_code == 200
     body = response.json()
@@ -134,13 +134,13 @@ async def test_get_user_allows_shared_collection_members_only(
     token = await login_user(client, "user_a", "StrongPass123!")
     headers = auth_header(token["access_token"])
 
-    own_response = await client.get(f"/users/{user_a['id']}", headers=headers)
+    own_response = await client.get(f"/api/users/{user_a['id']}", headers=headers)
     assert own_response.status_code == 200
 
-    shared_response = await client.get(f"/users/{user_b['id']}", headers=headers)
+    shared_response = await client.get(f"/api/users/{user_b['id']}", headers=headers)
     assert shared_response.status_code == 200
 
-    unshared_response = await client.get(f"/users/{user_c['id']}", headers=headers)
+    unshared_response = await client.get(f"/api/users/{user_c['id']}", headers=headers)
     assert unshared_response.status_code == 403
 
 
@@ -149,7 +149,7 @@ async def test_regular_user_must_verify_before_accessing_protected_endpoints(
     client: AsyncClient,
 ) -> None:
     register_response = await client.post(
-        "/users/register",
+        "/api/users/register",
         json={
             "username": "unverified_user",
             "email": "unverified_user@example.com",
@@ -163,13 +163,13 @@ async def test_regular_user_must_verify_before_accessing_protected_endpoints(
     token = await login_user(client, "unverified_user", "StrongPass123!")
     headers = auth_header(token["access_token"])
 
-    blocked_response = await client.get("/users/me", headers=headers)
+    blocked_response = await client.get("/api/users/me", headers=headers)
     assert blocked_response.status_code == 403
 
-    verify_response = await client.get(f"/users/verify/{verification_token}")
+    verify_response = await client.get(f"/api/users/verify/{verification_token}")
     assert verify_response.status_code == 200
 
-    me_response = await client.get("/users/me", headers=headers)
+    me_response = await client.get("/api/users/me", headers=headers)
     assert me_response.status_code == 200
     body = me_response.json()
     assert body["is_verified"] is True
@@ -181,7 +181,7 @@ async def test_demo_user_registration_skips_verification(
     client: AsyncClient,
 ) -> None:
     register_response = await client.post(
-        "/users/register",
+        "/api/users/register",
         json={"username": "demo_user", "password": "StrongPass123!"},
     )
     assert register_response.status_code == 201
@@ -189,7 +189,7 @@ async def test_demo_user_registration_skips_verification(
     token = await login_user(client, "demo_user", "StrongPass123!")
     headers = auth_header(token["access_token"])
 
-    me_response = await client.get("/users/me", headers=headers)
+    me_response = await client.get("/api/users/me", headers=headers)
     assert me_response.status_code == 200
     body = me_response.json()
     assert body["is_verified"] is False
@@ -201,7 +201,7 @@ async def test_demo_user_can_register_email_and_verify_it(
     client: AsyncClient,
 ) -> None:
     register_response = await client.post(
-        "/users/register",
+        "/api/users/register",
         json={"username": "upgrading_demo", "password": "StrongPass123!"},
     )
     assert register_response.status_code == 201
@@ -210,22 +210,22 @@ async def test_demo_user_can_register_email_and_verify_it(
     headers = auth_header(token["access_token"])
 
     email_response = await client.patch(
-        "/users/elevate-demo",
+        "/api/users/elevate-demo",
         json={"email": "upgrading_demo@example.com"},
         headers=headers,
     )
     assert email_response.status_code == 200
     verification_token = email_response.json()["verification_link"].rsplit("/", 1)[-1]
 
-    still_demo_response = await client.get("/users/me", headers=headers)
+    still_demo_response = await client.get("/api/users/me", headers=headers)
     assert still_demo_response.status_code == 200
     assert still_demo_response.json()["user_role"] == "demo"
     assert still_demo_response.json()["is_verified"] is False
 
-    verify_response = await client.get(f"/users/verify/{verification_token}")
+    verify_response = await client.get(f"/api/users/verify/{verification_token}")
     assert verify_response.status_code == 200
 
-    me_response = await client.get("/users/me", headers=headers)
+    me_response = await client.get("/api/users/me", headers=headers)
     assert me_response.status_code == 200
     body = me_response.json()
     assert body["user_role"] == "regular"
@@ -244,7 +244,7 @@ async def test_regular_user_cannot_register_demo_email(
     headers = auth_header(token["access_token"])
 
     response = await client.patch(
-        "/users/elevate-demo",
+        "/api/users/elevate-demo",
         json={"email": "new_email@example.com"},
         headers=headers,
     )
@@ -257,7 +257,7 @@ async def test_expired_demo_user_loses_access_but_keeps_me_endpoint(
     db_session: AsyncSession,
 ) -> None:
     register_response = await client.post(
-        "/users/register",
+        "/api/users/register",
         json={"username": "expired_demo", "password": "StrongPass123!"},
     )
     assert register_response.status_code == 201
@@ -274,10 +274,10 @@ async def test_expired_demo_user_loses_access_but_keeps_me_endpoint(
     )
     await db_session.commit()
 
-    me_response = await client.get("/users/me", headers=headers)
+    me_response = await client.get("/api/users/me", headers=headers)
     assert me_response.status_code == 200
 
-    users_response = await client.get("/users", headers=headers)
+    users_response = await client.get("/api/users", headers=headers)
     assert users_response.status_code == 403
 
 
@@ -286,7 +286,7 @@ async def test_regular_user_normal_registration_flow(
     client: AsyncClient,
 ) -> None:
     register_response = await client.post(
-        "/users/register",
+        "/api/users/register",
         json={
             "username": "flow_user",
             "email": "flow_user@example.com",
@@ -297,13 +297,13 @@ async def test_regular_user_normal_registration_flow(
     verification_link = register_response.json()["verification_link"]
     verification_token = verification_link.rsplit("/", 1)[-1]
 
-    verify_response = await client.get(f"/users/verify/{verification_token}")
+    verify_response = await client.get(f"/api/users/verify/{verification_token}")
     assert verify_response.status_code == 200
 
     token = await login_user(client, "flow_user", "StrongPass123!")
     headers = auth_header(token["access_token"])
 
-    me_response = await client.get("/users/me", headers=headers)
+    me_response = await client.get("/api/users/me", headers=headers)
     assert me_response.status_code == 200
     body = me_response.json()
     assert body["username"] == "flow_user"
@@ -374,7 +374,7 @@ async def test_register_responses(
     if email is not None:
         payload["email"] = email
 
-    response = await client.post("/users/register", json=payload)
+    response = await client.post("/api/users/register", json=payload)
 
     assert response.status_code == expected_status
     body = response.json()
@@ -384,7 +384,7 @@ async def test_register_responses(
     if expect_link:
         assert body["verification_link"] is not None
         assert body["verification_link"].startswith(
-            f"{settings.base_url}/users/verify/"
+            f"{settings.base_url}/api/users/verify/"
         )
     else:
         assert body["verification_link"] is None
@@ -405,7 +405,7 @@ async def test_register_demo_email_existing_email_returns_409(
     await db_session.commit()
 
     register_response = await client.post(
-        "/users/register",
+        "/api/users/register",
         json={"username": "race_demo", "password": "StrongPass123!"},
     )
     assert register_response.status_code == 201
@@ -414,7 +414,7 @@ async def test_register_demo_email_existing_email_returns_409(
     headers = auth_header(token["access_token"])
 
     response = await client.patch(
-        "/users/elevate-demo",
+        "/api/users/elevate-demo",
         json={"email": "taken@example.com"},
         headers=headers,
     )
@@ -427,7 +427,7 @@ async def test_register_demo_email_existing_email_returns_409(
 async def test_verify_registration_invalid_token_returns_400(
     client: AsyncClient,
 ) -> None:
-    response = await client.get("/users/verify/not-a-real-token")
+    response = await client.get("/api/users/verify/not-a-real-token")
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Invalid or expired verification link."
@@ -440,10 +440,10 @@ async def test_update_user(client: AsyncClient) -> None:
     headers = auth_header(token["access_token"])
 
     await client.patch(
-        "/users/update", json={"username": "updated_user"}, headers=headers
+        "/api/users/update", json={"username": "updated_user"}, headers=headers
     )
 
-    me_response = await client.get("/users/me", headers=headers)
+    me_response = await client.get("/api/users/me", headers=headers)
 
     assert me_response.json()["username"] == "updated_user"
 
@@ -457,7 +457,7 @@ async def test_change_email_same_as_current_email(client: AsyncClient) -> None:
     headers = auth_header(token["access_token"])
 
     response = await client.post(
-        "/users/change-email",
+        "/api/users/change-email",
         json={"email": "email_user@example.com"},
         headers=headers,
     )
@@ -478,7 +478,7 @@ async def test_change_email_happy_path(client: AsyncClient) -> None:
     headers = auth_header(token["access_token"])
 
     response = await client.post(
-        "/users/change-email",
+        "/api/users/change-email",
         json={"email": "new_email_user2@example.com"},
         headers=headers,
     )
@@ -490,7 +490,7 @@ async def test_change_email_happy_path(client: AsyncClient) -> None:
     assert verify_response.status_code == 200
     assert verify_response.json()["detail"] == "Email changed successfully."
 
-    me_response = await client.get("/users/me", headers=headers)
+    me_response = await client.get("/api/users/me", headers=headers)
     assert me_response.json()["email"] == "new_email_user2@example.com"
 
 
@@ -499,7 +499,7 @@ async def test_request_password_reset_user_not_found_returns_404(
     client: AsyncClient,
 ) -> None:
     response = await client.post(
-        "/users/reset-password", json={"email": "nobody@example.com"}
+        "/api/users/reset-password", json={"email": "nobody@example.com"}
     )
 
     assert response.status_code == 404
@@ -516,14 +516,14 @@ async def test_request_password_reset_happy_path(
     )
 
     response = await client.post(
-        "/users/reset-password", json={"email": "RESET_USER@example.com"}
+        "/api/users/reset-password", json={"email": "RESET_USER@example.com"}
     )
 
     assert response.status_code == 200
     body = response.json()
     assert body["detail"] == "Password reset link generated."
     assert body["verification_link"].startswith(
-        f"{settings.base_url}/users/reset-password/"
+        f"{settings.base_url}/api/users/reset-password/"
     )
 
     token = await db_session.scalar(
@@ -540,7 +540,7 @@ async def test_verify_registration_token_cannot_be_reused(
     client: AsyncClient,
 ) -> None:
     register_response = await client.post(
-        "/users/register",
+        "/api/users/register",
         json={
             "username": "verify_reuse_user",
             "email": "verify_reuse_user@example.com",
@@ -564,7 +564,8 @@ async def test_verify_demo_elevation_happy_path(
     db_session: AsyncSession,
 ) -> None:
     register_response = await client.post(
-        "/users/register", json={"username": "demo_user", "password": "StrongPass123!"}
+        "/api/users/register",
+        json={"username": "demo_user", "password": "StrongPass123!"},
     )
     assert register_response.status_code == 201
 
@@ -572,7 +573,7 @@ async def test_verify_demo_elevation_happy_path(
     headers = auth_header(token["access_token"])
 
     elevate_response = await client.patch(
-        "/users/elevate-demo",
+        "/api/users/elevate-demo",
         json={"email": "elevated_demo_user@example.com"},
         headers=headers,
     )
@@ -601,7 +602,7 @@ async def test_verify_email_change_token_cannot_be_reused(
     headers = auth_header(token["access_token"])
 
     change_response = await client.post(
-        "/users/change-email",
+        "/api/users/change-email",
         json={"email": "new_email_reuse_user@example.com"},
         headers=headers,
     )
@@ -625,7 +626,7 @@ async def test_verify_password_reset_happy_path(
     )
 
     reset_response = await client.post(
-        "/users/reset-password", json={"email": "reset_verify_user@example.com"}
+        "/api/users/reset-password", json={"email": "reset_verify_user@example.com"}
     )
     assert reset_response.status_code == 200
 
@@ -642,19 +643,19 @@ async def test_verify_password_reset_happy_path(
     await db_session.commit()
 
     raw_token = reset_response.json()["verification_link"].rsplit("/", 1)[-1]
-    verify_response = await client.get(f"/users/verify/{raw_token}")
+    verify_response = await client.get(f"/api/users/verify/{raw_token}")
 
     assert verify_response.status_code == 200
     assert verify_response.json()["detail"] == "Password reset successfully."
 
     old_login = await client.post(
-        "/users/token",
+        "/api/users/token",
         data={"username": "reset_verify_user", "password": "StrongPass123!"},
     )
     assert old_login.status_code == 401
 
     new_login = await client.post(
-        "/users/token",
+        "/api/users/token",
         data={"username": "reset_verify_user", "password": "NewStrongPass456!"},
     )
     assert new_login.status_code == 200
@@ -669,7 +670,7 @@ async def test_refresh_invalid_token_returns_401(
     client: AsyncClient,
 ) -> None:
     response = await client.post(
-        "/users/refresh",
+        "/api/users/refresh",
         json={"refresh_token": "not-a-real-refresh-token"},
     )
 
@@ -682,7 +683,7 @@ async def test_refresh_access_token_not_found_returns_401(
     client: AsyncClient,
 ) -> None:
     response = await client.post(
-        "/users/refresh",
+        "/api/users/refresh",
         json={"refresh_token": "not-a-real-refresh-token"},
     )
 
@@ -712,7 +713,7 @@ async def test_refresh_access_token_is_expired_returns_401(
     await db_session.refresh(refresh_token_object)
 
     response = await client.post(
-        "/users/refresh",
+        "/api/users/refresh",
         json={"refresh_token": tokens["refresh_token"]},
     )
     assert response.status_code == 401
@@ -742,7 +743,7 @@ async def test_refresh_access_token_is_revoked_returns_401(
     await db_session.refresh(refresh_token_object)
 
     response = await client.post(
-        "/users/refresh",
+        "/api/users/refresh",
         json={"refresh_token": tokens["refresh_token"]},
     )
     assert response.status_code == 401
@@ -763,19 +764,19 @@ async def test_refresh_access_family_reused_invdalidates_all_tokens(
     first_refresh_token = tokens["refresh_token"]
 
     second_response = await client.post(
-        "/users/refresh", json={"refresh_token": first_refresh_token}
+        "/api/users/refresh", json={"refresh_token": first_refresh_token}
     )
     assert second_response.status_code == 200
     second_refresh_token = second_response.json()["refresh_token"]
 
     third_response = await client.post(
-        "/users/refresh", json={"refresh_token": second_refresh_token}
+        "/api/users/refresh", json={"refresh_token": second_refresh_token}
     )
     assert third_response.status_code == 200
     third_refresh_token = third_response.json()["refresh_token"]
 
     reuse_response = await client.post(
-        "/users/refresh", json={"refresh_token": first_refresh_token}
+        "/api/users/refresh", json={"refresh_token": first_refresh_token}
     )
     assert reuse_response.status_code == 401
     assert (
@@ -801,7 +802,7 @@ async def test_refresh_access_family_reused_invdalidates_all_tokens(
 
     # the previously valid third token should now be rejected too
     blocked_response = await client.post(
-        "/users/refresh", json={"refresh_token": third_refresh_token}
+        "/api/users/refresh", json={"refresh_token": third_refresh_token}
     )
     assert blocked_response.status_code == 401
 
@@ -823,7 +824,7 @@ async def test_refresh_access_token_deleted_user_returns_401(
     await db_session.commit()
 
     response = await client.post(
-        "/users/refresh",
+        "/api/users/refresh",
         json={"refresh_token": tokens["refresh_token"]},
     )
     assert response.status_code == 401
@@ -835,7 +836,7 @@ async def test_logout_unknown_refresh_token_returns_already_invalid_message(
     client: AsyncClient,
 ) -> None:
     response = await client.post(
-        "/users/logout",
+        "/api/users/logout",
         json={
             "refresh_token": "not-a-real-refresh-token",
             "all_sessions": False,
@@ -876,7 +877,7 @@ async def test_logout_revokes_single_refresh_token(
     assert refresh_token_record.revoked_at is None
 
     response = await client.post(
-        "/users/logout",
+        "/api/users/logout",
         json={
             "refresh_token": refresh_token_raw,
             "all_sessions": False,
@@ -912,7 +913,7 @@ async def test_logout_all_sessions_revokes_refresh_token_family(
     first_refresh_token = tokens["refresh_token"]
 
     refresh_response = await client.post(
-        "/users/refresh",
+        "/api/users/refresh",
         json={"refresh_token": first_refresh_token},
     )
 
@@ -943,7 +944,7 @@ async def test_logout_all_sessions_revokes_refresh_token_family(
     assert len(family_tokens_before) == 2
 
     response = await client.post(
-        "/users/logout",
+        "/api/users/logout",
         json={
             "refresh_token": second_refresh_token,
             "all_sessions": True,
@@ -978,7 +979,7 @@ async def test_account_deletion_happy_path(
     token = await login_user(client, "deletion_user", "StrongPass123!")
     headers = auth_header(token["access_token"])
 
-    response = await client.post("/users/account-deletion", headers=headers)
+    response = await client.post("/api/users/account-deletion", headers=headers)
 
     assert response.status_code == 200
     body = response.json()
@@ -993,7 +994,7 @@ async def test_account_deletion_happy_path(
     assert deleted_user is None
 
     login_response = await client.post(
-        "/users/token",
+        "/api/users/token",
         data={"username": "deletion_user", "password": "StrongPass123!"},
     )
     assert login_response.status_code == 401
@@ -1003,7 +1004,7 @@ async def test_account_deletion_happy_path(
 async def test_account_deletion_requires_authentication(
     client: AsyncClient,
 ) -> None:
-    response = await client.post("/users/account-deletion")
+    response = await client.post("/api/users/account-deletion")
 
     assert response.status_code == 401
 
@@ -1021,7 +1022,7 @@ async def test_verify_account_deletion_token_cannot_be_reused(
     token = await login_user(client, "deletion_reuse_user", "StrongPass123!")
     headers = auth_header(token["access_token"])
 
-    delete_response = await client.post("/users/account-deletion", headers=headers)
+    delete_response = await client.post("/api/users/account-deletion", headers=headers)
     verification_link = delete_response.json()["verification_link"]
 
     first_verify = await client.get(verification_link)

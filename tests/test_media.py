@@ -24,14 +24,14 @@ async def test_upload_and_retrieve_media(
 
     # Create a collection for the user
     collection_response = await client.post(
-        "/collections",
+        "/api/collections",
         json={"name": "Test Collection", "description": "A test collection."},
         headers=headers,
     )
 
     # Assert that user can't upload to a bad collection
     media_response = await client.post(
-        "/media",
+        "/api/media",
         params={"collection_id": 9999},
         files=[
             ("files", ("photo1.jpg", b"fake-image-data", "image/jpeg")),
@@ -43,7 +43,7 @@ async def test_upload_and_retrieve_media(
 
     # Assert that user can upload media to the collection
     media_response = await client.post(
-        "/media",
+        "/api/media",
         params={"collection_id": collection_response.json()["id"]},
         files=[
             ("files", ("photo1.jpg", b"fake-image-data", "image/jpeg")),
@@ -55,19 +55,19 @@ async def test_upload_and_retrieve_media(
 
     # Assert that user can retrieve the uploaded media
     media_id = media_response.json()[0]["id"]
-    retrieve_response = await client.get(f"/media/{media_id}", headers=headers)
+    retrieve_response = await client.get(f"/api/media/{media_id}", headers=headers)
     assert retrieve_response.status_code == 200
 
     # Assert 400 if media not found or user doesn't have access
-    bad_retrieve_response = await client.get("/media/9999", headers=headers)
+    bad_retrieve_response = await client.get("/api/media/9999", headers=headers)
     assert bad_retrieve_response.status_code == 400
 
     # Assert user can delete media
-    delete_response = await client.delete(f"/media/{media_id}", headers=headers)
+    delete_response = await client.delete(f"/api/media/{media_id}", headers=headers)
     assert delete_response.status_code == 204
 
     # Assert 400 if user tries to delete media they don't have access to
-    bad_delete_response = await client.delete("/media/9999", headers=headers)
+    bad_delete_response = await client.delete("/api/media/9999", headers=headers)
     assert bad_delete_response.status_code == 400
 
 
@@ -87,13 +87,13 @@ async def test_upload_rejects_file_over_maximum_size(
     headers = auth_header(token["access_token"])
 
     collection_response = await client.post(
-        "/collections",
+        "/api/collections",
         json={"name": "Size Test Collection"},
         headers=headers,
     )
 
     media_response = await client.post(
-        "/media",
+        "/api/media",
         params={"collection_id": collection_response.json()["id"]},
         files=[("files", ("large.jpg", b"123456", "image/jpeg"))],
         headers=headers,
@@ -119,14 +119,14 @@ async def test_upload_rejects_user_storage_limit(
     headers = auth_header(token["access_token"])
 
     collection_response = await client.post(
-        "/collections",
+        "/api/collections",
         json={"name": "Storage Test Collection"},
         headers=headers,
     )
     collection_id = collection_response.json()["id"]
 
     first_upload = await client.post(
-        "/media",
+        "/api/media",
         params={"collection_id": collection_id},
         files=[("files", ("first.jpg", b"1234", "image/jpeg"))],
         headers=headers,
@@ -134,7 +134,7 @@ async def test_upload_rejects_user_storage_limit(
     assert first_upload.status_code == 201
 
     second_upload = await client.post(
-        "/media",
+        "/api/media",
         params={"collection_id": collection_id},
         files=[("files", ("second.jpg", b"12", "image/jpeg"))],
         headers=headers,
@@ -161,12 +161,12 @@ async def test_comment_and_reactions(
 
     # Create a collection for the user
     collection_response = await client.post(
-        "/collections",
+        "/api/collections",
         json={"name": "Test Collection", "description": "A test collection."},
         headers=headers,
     )
     media_response = await client.post(
-        "/media",
+        "/api/media",
         params={"collection_id": collection_response.json()["id"]},
         files=[
             ("files", ("photo1.jpg", b"fake-image-data", "image/jpeg")),
@@ -178,7 +178,7 @@ async def test_comment_and_reactions(
     # Assert that user can comment on the media
     media_id = media_response.json()[0]["id"]
     comment_response = await client.post(
-        f"/media/comment/{media_id}",
+        f"/api/media/comment/{media_id}",
         json={"content": "This is a test comment."},
         headers=headers,
     )
@@ -186,14 +186,14 @@ async def test_comment_and_reactions(
 
     # Assert that user can react to the media
     reaction_response = await client.post(
-        f"/media/react/{media_id}",
+        f"/api/media/react/{media_id}",
         json={"type": "like"},
         headers=headers,
     )
     assert reaction_response.status_code == 201
 
     # Assert that comment and reaction is visible when retrieving media
-    retrieve_response = await client.get(f"/media/{media_id}", headers=headers)
+    retrieve_response = await client.get(f"/api/media/{media_id}", headers=headers)
     assert retrieve_response.status_code == 200
     assert (
         retrieve_response.json()["comments"][0]["content"] == "This is a test comment."
@@ -203,18 +203,18 @@ async def test_comment_and_reactions(
     # Assert that user can delete their comment and reaction
     comment_id = 1
     delete_comment_response = await client.delete(
-        f"/media/comment/{comment_id}", headers=headers
+        f"/api/media/comment/{comment_id}", headers=headers
     )
     assert delete_comment_response.status_code == 204
     reaction_id = 1
     delete_reaction_response = await client.delete(
-        f"/media/react/{reaction_id}", headers=headers
+        f"/api/media/react/{reaction_id}", headers=headers
     )
     assert delete_reaction_response.status_code == 204
 
     # Assert that comment and reaction is no longer visible when retrieving media
     retrieve_response_after_delete = await client.get(
-        f"/media/{media_id}", headers=headers
+        f"/api/media/{media_id}", headers=headers
     )
     assert retrieve_response_after_delete.status_code == 200
     assert len(retrieve_response_after_delete.json()["comments"]) == 0
@@ -222,11 +222,11 @@ async def test_comment_and_reactions(
 
     # Assert 400 if reaction or comment not found
     bad_delete_comment_response = await client.delete(
-        "/media/comment/9999", headers=headers
+        "/api/media/comment/9999", headers=headers
     )
     assert bad_delete_comment_response.status_code == 400
     bad_delete_reaction_response = await client.delete(
-        "/media/react/9999", headers=headers
+        "/api/media/react/9999", headers=headers
     )
     assert bad_delete_reaction_response.status_code == 400
 
@@ -254,14 +254,14 @@ async def test_comment_and_reaction_access_control(
 
     # Create a collection for user1
     collection_response = await client.post(
-        "/collections",
+        "/api/collections",
         json={"name": "User1 Collection", "description": "A test collection."},
         headers=headers1,
     )
 
     # Upload media to the collection
     media_response = await client.post(
-        "/media",
+        "/api/media",
         params={"collection_id": collection_response.json()["id"]},
         files=[
             ("files", ("photo1.jpg", b"fake-image-data", "image/jpeg")),
@@ -276,7 +276,7 @@ async def test_comment_and_reaction_access_control(
     # Assert that user2 cannot comment on user1's media
     media_id = media_response.json()[0]["id"]
     comment_response = await client.post(
-        f"/media/comment/{media_id}",
+        f"/api/media/comment/{media_id}",
         json={"content": "This is a test comment."},
         headers=headers2,
     )
@@ -284,7 +284,7 @@ async def test_comment_and_reaction_access_control(
 
     # Assert that user2 cannot react to user1's media
     reaction_response = await client.post(
-        f"/media/react/{media_id}",
+        f"/api/media/react/{media_id}",
         json={"type": "like"},
         headers=headers2,
     )

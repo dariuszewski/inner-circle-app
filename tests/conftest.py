@@ -131,7 +131,7 @@ async def create_test_user(
     client: AsyncClient, username: str, email: str, password: str
 ) -> dict[str, Any]:
     response = await client.post(
-        "/users/register",
+        "/api/users/register",
         json={"username": username, "email": email, "password": password},
     )
     assert response.status_code == 201
@@ -141,7 +141,7 @@ async def create_test_user(
 
     token = await login_user(client, username, password)
     me_response = await client.get(
-        "/users/me", headers=auth_header(token["access_token"])
+        "/api/users/me", headers=auth_header(token["access_token"])
     )
     assert me_response.status_code == 200
     return cast(dict[str, Any], me_response.json())
@@ -151,7 +151,7 @@ async def login_user(
     client: AsyncClient, username: str, password: str
 ) -> dict[str, Any]:
     response = await client.post(
-        "/users/token",
+        "/api/users/token",
         data={"username": username, "password": password},
     )
     assert response.status_code == 200

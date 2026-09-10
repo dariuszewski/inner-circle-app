@@ -44,9 +44,9 @@ app = FastAPI(
     version=settings.app_version,
     description=settings.app_description,
 )
-app.include_router(user_router)
-app.include_router(collection_router)
-app.include_router(media_router)
+app.include_router(user_router, prefix="/api")
+app.include_router(collection_router, prefix="/api")
+app.include_router(media_router, prefix="/api")
 
 app.mount(
     settings.uploads_mount_path,
@@ -82,7 +82,7 @@ async def add_request_id(request: Request, call_next: Any) -> Any:
         request_id_context.reset(token)
 
 
-@app.get("/")
+@app.get("/api/")
 async def read_root(
     accept_language: Annotated[str | None, Header()] = None,
 ) -> dict:

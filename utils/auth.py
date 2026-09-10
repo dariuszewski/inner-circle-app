@@ -16,7 +16,7 @@ from models import RefreshToken, User, UserRole
 from schemas import UserRetrievePrivate
 
 password_hash = PasswordHash.recommended()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/token")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
