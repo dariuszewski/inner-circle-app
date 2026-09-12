@@ -33,7 +33,7 @@ Prerequisites:
 
 **Note:** The development environment is configured so that changes in the backend and frontend are updated in real time.
 
-### Backend
+### Backend:
 
 You can also run the database and the backend without the frontend.
 
@@ -197,8 +197,8 @@ Full pre-commit check
 uv run pre-commit run
 ```
 
-
 ## Notes
 
-The local setup uses PostgreSQL through Docker. Uploaded files are stored in
-the `uploads/` directory.
+The local setup uses PostgreSQL through Docker. Uploaded files are stored in the `uploads/` directory.
+
+The local development environment serves the frontend in a separate container with hot reloading (`npm run dev`). In production (such as FastAPI Cloud), the frontend is served directly by FastAPI from `frontend/dist/`. Therefore, any frontend changes must be built (`cd frontend && npm run build`) and pushed to Git so the updated `frontend/dist/` directory is deployed. 
