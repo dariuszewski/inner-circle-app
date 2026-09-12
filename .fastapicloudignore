@@ -1,3 +1,13 @@
+# Docker
+Dockerfile
+Dockerfile*
+*.Dockerfile
+.dockerignore
+docker-compose*.yml
+**/Dockerfile
+**/.dockerignore
+
+
 # Frontend (Only upload frontend/dist)
 frontend/src/
 frontend/public/
