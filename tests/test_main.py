@@ -12,5 +12,5 @@ def client() -> TestClient:
 
 def test_root_endpoint(client: TestClient) -> None:
     """Test that the / endpoint is working"""
-    response = client.get("/api/")
+    response = client.get("/")
     assert response.status_code == 200

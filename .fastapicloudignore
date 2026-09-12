@@ -1,0 +1,48 @@
+# Byte-compiled / Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Git & IDE
+.git/
+.gitignore
+.dockerignore
+.vscode/
+.idea/
+
+# Environment files with secrets
+.env
+prod.env
+
+# Storage & Uploads
+uploads/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs & Temporary files
+*.log
+requests.log
+todo.txt
+
+# Test coverage & Reports
+.coverage
+coverage.xml
+htmlcov/
+tests/
+
+# Frontend raw source files (only frontend/dist is needed)
+frontend/src/
+frontend/node_modules/
+frontend/public/
+frontend/dev-dist/
+frontend/.eslintrc*
+frontend/tsconfig*.json
+frontend/vite.config.ts

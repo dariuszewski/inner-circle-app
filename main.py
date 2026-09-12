@@ -54,6 +54,8 @@ app.mount(
     name="uploads",
 )
 
+app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allow_origins,

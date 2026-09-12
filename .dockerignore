@@ -1,0 +1,54 @@
+# Byte-compiled / optimized / C-extension files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Caches & IDEs
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.vscode/
+.idea/
+
+# Git & Docker
+.git/
+.gitignore
+.dockerignore
+
+# Environment & Secrets
+.env
+*.env
+prod.env
+
+# Storage & Uploads
+uploads/
+
+# Frontend
+frontend/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs & Temporary files
+*.log
+requests.log
+todo.txt
+
+# Test coverage & Reports
+.coverage
+coverage.xml
+htmlcov/
+
+# Build & Container configs
+README.md
+Dockerfile
+docker-compose*.yml
+.pre-commit-config.yaml

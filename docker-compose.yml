@@ -10,6 +10,41 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+      provenance: false
+    container_name: inner_circle_backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://ic_user:ic_password@db:5432/ic_db
+    volumes:
+      - .:/app
+      # Mask the host virtualenv directory (Windows .venv) so container operations
+      # won't try to remove or modify host files (prevents I/O error / access denied).
+      - backend_venv:/app/.venv
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+      provenance: false
+    container_name: inner_circle_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - BACKEND_URL=http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
+  backend_venv:
   
