@@ -11,6 +11,15 @@ export default defineConfig({
         enabled: true,
         type: 'module',
       },
+      workbox: {
+        navigateFallbackDenylist: [
+          /^\/api/,
+          /^\/docs/,
+          /^\/redoc/,
+          /^\/openapi\.json/,
+          /^\/uploads/,
+        ],
+      },
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'assets/*'],
       manifest: {
         name: 'Inner Circle',
