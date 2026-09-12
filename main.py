@@ -7,9 +7,12 @@ from typing import Annotated, Any
 from fastapi import (
     FastAPI,
     Header,
+    HTTPException,
     Request,
+    status,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import settings
@@ -54,8 +57,6 @@ app.mount(
     name="uploads",
 )
 
-app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allow_origins,
@@ -92,3 +93,31 @@ async def read_root(
         return {"message": "Witaj, Świecie!"}
 
     return {"message": "Hello, World!"}
+
+
+frontend_dist = pathlib.Path(__file__).parent / "frontend" / "dist"
+
+if frontend_dist.exists():
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str) -> FileResponse:
+        if (
+            full_path.startswith("api")
+            or full_path.startswith("docs")
+            or full_path.startswith("redoc")
+            or full_path.startswith("openapi.json")
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Not Found"
+            )
+
+        file_path = frontend_dist / full_path
+        if full_path and file_path.is_file():
+            return FileResponse(file_path)
+
+        return FileResponse(frontend_dist / "index.html")
+else:
+
+    @app.get("/")
+    async def read_root_fallback() -> dict:
+        return {"message": "Hello, World!"}
