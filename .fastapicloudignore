@@ -1,43 +1,3 @@
-# Python & Virtual Envs
-__pycache__/
-*.py[oc]
-.venv/
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-
-# Git, IDE & Configs
-.git/
-.gitignore
-.dockerignore
-.vscode/
-.idea/
-Dockerfile
-docker-compose*.yml
-.pre-commit-config.yaml
-
-# Secrets & Environment
-*.env
-.env
-prod.env
-
-# Databases, Storage & Uploads
-uploads/
-*.db
-*.sqlite
-*.sqlite3
-
-# Logs & Temporary files
-*.log
-requests.log
-todo.txt
-
-# Tests & Coverage
-.coverage
-coverage.xml
-htmlcov/
-tests/
-
 # Frontend (Only upload frontend/dist)
 frontend/src/
 frontend/public/
@@ -49,3 +9,5 @@ frontend/eslint*
 frontend/tsconfig*
 frontend/vite.config.ts
 frontend/README.md
+!dist/
+!frontend/dist
