@@ -5,10 +5,10 @@ import {
   Card,
   CardContent,
   Container,
+  Divider,
   Paper,
   Typography,
 } from '@mui/material'
-import { useState } from 'react'
 import { useLoaderData } from 'react-router'
 
 import AnimatedLogo from '../components/AnimatedLogo'
@@ -17,7 +17,6 @@ import type { RootData } from '../types/rootResponse'
 
 function HomePage() {
   const { records, error } = useLoaderData<RootData>()
-  const [count, setCount] = useState<number>(0)
 
   return (
     <Container 
@@ -30,25 +29,45 @@ function HomePage() {
         <AnimatedLogo />
 
         <Typography variant="h4" component="h1">
-          Hello, Inner Circle!
+          Join the Inner Circle!
+        </Typography>
+
+        <Typography variant="body1" sx={{ my: 2 }}>
+          Create private spaces for you and your friends to share memories securely in your inner circle.
         </Typography>
 
         <Card variant="outlined" sx={{ my: 3, p: 2 }}>
           <CardContent>
-            <Typography variant="h6" color="text.secondary" gutterBottom>
-              Counter
-            </Typography>
-            <Typography variant="h3" color="primary" sx={{ my: 1, fontWeight: 'medium' }}>
-              {count}
-            </Typography>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => setCount(prev => prev + 1)}
-              sx={{ mt: 1 }}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'stretch',
+                justifyContent: 'center',
+                gap: { xs: 2, sm: 3 },
+                flexDirection: { xs: 'column', sm: 'row' },
+              }}
             >
-              Increment
-            </Button>
+              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Typography variant="h6" gutterBottom>
+                  Already in the circle?
+                </Typography>
+                <Button variant="contained" color="primary" href="/login">
+                  Log in
+                </Button>
+              </Box>
+
+              <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
+              <Divider sx={{ display: { xs: 'block', sm: 'none' } }} />
+
+              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Typography variant="h6" gutterBottom>
+                  New to the circle?
+                </Typography>
+                <Button variant="outlined" color="primary" href="/register">
+                  Register
+                </Button>
+              </Box>
+            </Box>
           </CardContent>
         </Card>
 
