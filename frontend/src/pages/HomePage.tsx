@@ -11,7 +11,7 @@ import {
 import { useState } from 'react'
 import { useLoaderData } from 'react-router'
 
-import innerCircleLogo from '../assets/logo.svg'
+import AnimatedLogo from '../components/AnimatedLogo'
 import type { RootData } from '../types/rootResponse'
 
 
@@ -20,11 +20,14 @@ function HomePage() {
   const [count, setCount] = useState<number>(0)
 
   return (
-    <Container maxWidth="sm" sx={{ py: 6 }}>
-      <Paper elevation={3} sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
-        <Box sx={{ mb: 3 }}>
-          <img width="160" src={innerCircleLogo} alt="Inner Circle Logo" />
-        </Box>
+    <Container 
+      maxWidth="sm" 
+      disableGutters 
+      sx={{ minHeight: '100dvh' }}
+    >
+      <Paper elevation={3} sx={{ minHeight: '100dvh', p: 1, textAlign: 'center', borderRadius: 2 }}>
+
+        <AnimatedLogo />
 
         <Typography variant="h4" component="h1">
           Hello, Inner Circle!
