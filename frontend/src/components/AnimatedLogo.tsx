@@ -6,6 +6,7 @@ function AnimatedLogo() {
   return (
     <Box
       sx={{
+        mt: { xs: -2, sm: -3 },
         mb: 1,
         mx: 'auto',
         width: { xs: 300, sm: 380 },

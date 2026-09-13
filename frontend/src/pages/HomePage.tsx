@@ -24,7 +24,7 @@ function HomePage() {
       disableGutters 
       sx={{ minHeight: '100dvh' }}
     >
-      <Paper elevation={3} sx={{ minHeight: '100dvh', p: 1, textAlign: 'center', borderRadius: 2 }}>
+      <Paper elevation={3} sx={{ minHeight: '100dvh', p: { xs: 2, sm: 3 }, pt: { xs: 1, sm: 2 }, textAlign: 'center', borderRadius: 2 }}>
 
         <AnimatedLogo />
 
@@ -32,38 +32,38 @@ function HomePage() {
           Join the Inner Circle!
         </Typography>
 
-        <Typography variant="body1" sx={{ my: 2 }}>
+        <Typography variant="body1" sx={{ my: { xs: 1.5, sm: 2 } }}>
           Create private spaces for you and your friends to share memories securely in your inner circle.
         </Typography>
 
-        <Card variant="outlined" sx={{ my: 3, p: 2 }}>
-          <CardContent>
+        <Card variant="outlined" sx={{ my: { xs: 2, sm: 3 }, p: 0 }}>
+          <CardContent sx={{ p: { xs: 1.5, sm: 2.5 }, '&:last-child': { pb: { xs: 1.5, sm: 2.5 } } }}>
             <Box
               sx={{
                 display: 'flex',
                 alignItems: 'stretch',
                 justifyContent: 'center',
-                gap: { xs: 2, sm: 3 },
+                gap: { xs: 1.5, sm: 3 },
                 flexDirection: { xs: 'column', sm: 'row' },
               }}
             >
               <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' }, mb: { xs: 0.5, sm: 1 } }}>
                   Already in the circle?
                 </Typography>
-                <Button variant="contained" color="primary" href="/login">
+                <Button variant="contained" color="primary" href="/login" sx={{ width: '100%', maxWidth: 180, py: 1 }}>
                   Log in
                 </Button>
               </Box>
 
               <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
-              <Divider sx={{ display: { xs: 'block', sm: 'none' } }} />
+              <Divider sx={{ display: { xs: 'block', sm: 'none' }, my: 0.5 }} />
 
               <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' }, mb: { xs: 0.5, sm: 1 } }}>
                   New to the circle?
                 </Typography>
-                <Button variant="outlined" color="primary" href="/register">
+                <Button variant="outlined" color="primary" href="/register" sx={{ width: '100%', maxWidth: 180, py: 1 }}>
                   Register
                 </Button>
               </Box>
@@ -71,7 +71,7 @@ function HomePage() {
           </CardContent>
         </Card>
 
-        <Box sx={{ mt: 3 }}>
+        <Box sx={{ mt: { xs: 2, sm: 3 } }}>
           <Typography variant="h6" align="left" gutterBottom>
             API Status
           </Typography>
