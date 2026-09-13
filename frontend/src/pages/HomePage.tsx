@@ -1,47 +1,23 @@
-import { useState, useEffect } from 'react'
 import {
   Alert,
   Box,
   Button,
   Card,
   CardContent,
-  CircularProgress,
   Container,
   Paper,
   Typography,
 } from '@mui/material'
-import innerCircleLogo from './assets/logo.svg'
+import { useState } from 'react'
+import { useLoaderData } from 'react-router'
 
-interface ApiResponse {
-  message: string
-}
+import innerCircleLogo from '../assets/logo.svg'
+import type { RootData } from '../types/rootResponse'
 
-function App() {
+
+function HomePage() {
+  const { records, error } = useLoaderData<RootData>()
   const [count, setCount] = useState<number>(0)
-  const [loading, setLoading] = useState<boolean>(true)
-  const [data, setData] = useState<ApiResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetch('/api/')
-      .then((response): Promise<ApiResponse> => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`)
-        }
-        return response.json()
-      })
-      .then((responseData: ApiResponse) => {
-        console.log(responseData)
-        setData(responseData)
-        setLoading(false)
-      })
-      .catch((err: unknown) => {
-        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred'
-        console.error('Error fetching data:', err)
-        setError(errorMessage)
-        setLoading(false)
-      })
-  }, [])
 
   return (
     <Container maxWidth="sm" sx={{ py: 6 }}>
@@ -78,19 +54,13 @@ function App() {
             API Status
           </Typography>
 
-          {loading && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-              <CircularProgress />
-            </Box>
-          )}
-
           {error && (
             <Alert severity="error" sx={{ textAlign: 'left' }}>
               Error: {error}
             </Alert>
           )}
 
-          {data && (
+          {records && (
             <Paper
               variant="outlined"
               sx={{
@@ -101,7 +71,7 @@ function App() {
                 fontFamily: 'monospace',
               }}
             >
-              <pre style={{ margin: 0 }}>{JSON.stringify(data, null, 2)}</pre>
+              <pre style={{ margin: 0 }}>{JSON.stringify(records, null, 2)}</pre>
             </Paper>
           )}
         </Box>
@@ -110,4 +80,4 @@ function App() {
   )
 }
 
-export default App
+export default HomePage;
