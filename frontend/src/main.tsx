@@ -61,6 +61,19 @@ const theme = createTheme({
         },
       },
     },
+    MuiAlert: {
+      styleOverrides: {
+        message: {
+          color: '#FFFFFF',
+        },
+        icon: {
+          color: '#FFFFFF',
+        },
+        action: {
+          color: '#FFFFFF',
+        },
+      },
+    },
   },
 });
 

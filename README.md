@@ -125,6 +125,8 @@ When changing SQLAlchemy models:
 - Typescript
 - MaterialUI
 - Vite-PWA
+- React Router (data mode)
+- qrcode.react
 
 ## Project Structure
 

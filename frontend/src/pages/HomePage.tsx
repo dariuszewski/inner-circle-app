@@ -1,5 +1,4 @@
 import {
-  Alert,
   Box,
   Button,
   Card,
@@ -9,14 +8,17 @@ import {
   Paper,
   Typography,
 } from '@mui/material'
+import { QRCodeSVG } from 'qrcode.react'
+import { useState } from 'react'
 import { useLoaderData } from 'react-router'
 
 import AnimatedLogo from '../components/AnimatedLogo'
+import SlidingSnackbar from '../components/SlidingSnackbar'
 import type { RootData } from '../types/rootResponse'
-
 
 function HomePage() {
   const { records, error } = useLoaderData<RootData>()
+  const [toastOpen, setToastOpen] = useState(Boolean(records || error))
 
   return (
     <Container 
@@ -24,7 +26,7 @@ function HomePage() {
       disableGutters 
       sx={{ minHeight: '100dvh' }}
     >
-      <Paper elevation={3} sx={{ minHeight: '100dvh', p: { xs: 2, sm: 3 }, pt: { xs: 1, sm: 2 }, textAlign: 'center', borderRadius: 2 }}>
+      <Paper sx={{ boxShadow: 'none', minHeight: '100dvh', p: { xs: 2, sm: 3 }, pt: { xs: 1, sm: 2 }, textAlign: 'center', borderRadius: 2 }}>
 
         <AnimatedLogo />
 
@@ -48,10 +50,10 @@ function HomePage() {
               }}
             >
               <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' }, mb: { xs: 0.5, sm: 1 } }}>
+                <Typography variant="body1" sx={{ mb: { xs: 0.5, sm: 1 } }}>
                   Already in the circle?
                 </Typography>
-                <Button variant="contained" color="primary" href="/login" sx={{ width: '100%', maxWidth: 180, py: 1 }}>
+                <Button variant="contained" color="primary" href="/login" sx={{ width: '100%', maxWidth: 240, py: 1 }}>
                   Log in
                 </Button>
               </Box>
@@ -60,43 +62,37 @@ function HomePage() {
               <Divider sx={{ display: { xs: 'block', sm: 'none' }, my: 0.5 }} />
 
               <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' }, mb: { xs: 0.5, sm: 1 } }}>
-                  New to the circle?
+                <Typography variant="body1" sx={{ mb: { xs: 0.5, sm: 1 } }}>
+                  No email required to join!
                 </Typography>
-                <Button variant="outlined" color="primary" href="/register" sx={{ width: '100%', maxWidth: 180, py: 1 }}>
-                  Register
+                <Button variant="outlined" color="primary" href="/register" sx={{ width: '100%', maxWidth: 240, py: 1 }}>
+                  Sign up
                 </Button>
               </Box>
             </Box>
           </CardContent>
         </Card>
 
-        <Box sx={{ mt: { xs: 2, sm: 3 } }}>
-          <Typography variant="h6" align="left" gutterBottom>
-            API Status
+        <Box sx={{ mt: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <Typography variant="h6" gutterBottom>
+            Share the Inner Circle app with your friends!
           </Typography>
-
-          {error && (
-            <Alert severity="error" sx={{ textAlign: 'left' }}>
-              Error: {error}
-            </Alert>
-          )}
-
-          {records && (
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 2,
-                backgroundColor: 'grey.100',
-                textAlign: 'left',
-                overflowX: 'auto',
-                fontFamily: 'monospace',
-              }}
-            >
-              <pre style={{ margin: 0 }}>{JSON.stringify(records, null, 2)}</pre>
-            </Paper>
-          )}
+          <Box sx={{ p: 1.5, backgroundColor: '#FFFFFF', borderRadius: 1 }}>
+            <QRCodeSVG
+              value={window.location.origin}
+              size={220}
+              bgColor="#FFFFFF"
+              fgColor="#000000"
+            />
+          </Box>
         </Box>
+
+        <SlidingSnackbar
+          open={toastOpen}
+          onClose={() => setToastOpen(false)}
+          severity={error ? 'danger' : 'success'}
+          message={error ? `API error: ${error}` : 'Services are up and running.'}
+        />
       </Paper>
     </Container>
   )
