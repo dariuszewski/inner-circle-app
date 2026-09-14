@@ -3,9 +3,7 @@ import {
   Button,
   Card,
   CardContent,
-  Container,
   Divider,
-  Paper,
   Typography,
 } from '@mui/material'
 import { QRCodeSVG } from 'qrcode.react'
@@ -21,13 +19,7 @@ function HomePage() {
   const [toastOpen, setToastOpen] = useState(Boolean(records || error))
 
   return (
-    <Container 
-      maxWidth="sm" 
-      disableGutters 
-      sx={{ minHeight: '100dvh' }}
-    >
-      <Paper sx={{ boxShadow: 'none', minHeight: '100dvh', p: { xs: 2, sm: 3 }, pt: { xs: 1, sm: 2 }, textAlign: 'center', borderRadius: 2 }}>
-
+    <>
         <AnimatedLogo />
 
         <Typography variant="h4" component="h1">
@@ -93,8 +85,7 @@ function HomePage() {
           severity={error ? 'danger' : 'success'}
           message={error ? `API error: ${error}` : 'Services are up and running.'}
         />
-      </Paper>
-    </Container>
+    </>
   )
 }
 

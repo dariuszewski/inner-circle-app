@@ -11,7 +11,9 @@ import { RouterProvider } from "react-router/dom";
 import RootLayout from './layouts/RootLayout.tsx';
 import homeLoader from './loaders/homeLoader.ts';
 import HomePage from './pages/HomePage.tsx';
+import LoginPage from './pages/LoginPage.tsx';
 import NotFoundPage from './pages/NotFoundPage.tsx';
+import RegisterPage from './pages/RegisterPage.tsx';
 
 const router = createBrowserRouter([
   {
@@ -22,6 +24,14 @@ const router = createBrowserRouter([
         path: '/', 
         element: <HomePage />,
         loader: homeLoader,
+      },
+      {
+        path: '/register',
+        element: <RegisterPage />,
+      },
+      {
+        path: '/login',
+        element: <LoginPage />,
       },
       {
         path: '*',

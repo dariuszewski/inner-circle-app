@@ -1,26 +1,17 @@
-import { Button, Container, Paper, Typography } from '@mui/material'
+import { Box, Button, Typography } from '@mui/material'
 
 import AnimatedLogo from '../components/AnimatedLogo'
 
 function NotFoundPage() {
   return (
-    <Container
-      maxWidth="sm"
-      disableGutters
-      sx={{ minHeight: '100dvh', display: 'grid', placeItems: 'center' }}
-    >
-      <Paper
-        elevation={3}
+    <Box
         sx={{
-          width: '100%',
           minHeight: '100dvh',
-          p: { xs: 2, sm: 4 },
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           textAlign: 'center',
-          borderRadius: { xs: 0, sm: 2 },
         }}
       >
         <AnimatedLogo />
@@ -36,8 +27,7 @@ function NotFoundPage() {
         <Button variant="contained" color="primary" href="/">
           Return home
         </Button>
-      </Paper>
-    </Container>
+      </Box>
   )
 }
 
