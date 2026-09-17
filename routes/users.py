@@ -452,8 +452,14 @@ async def login_for_access_token(
     db: Annotated[AsyncSession, Depends(get_db)],
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Token:
+    identifier = form_data.username.strip().lower()
     result = await db.execute(
-        select(User).where(func.lower(User.username) == func.lower(form_data.username))
+        select(User).where(
+            or_(
+                func.lower(User.username) == identifier,
+                func.lower(User.email) == identifier,
+            )
+        )
     )
     user: User | None = result.scalar_one_or_none()
 

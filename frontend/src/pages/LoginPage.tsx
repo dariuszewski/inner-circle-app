@@ -1,13 +1,36 @@
 import { Box, Button, TextField, Typography } from '@mui/material'
 import type { SubmitEventHandler } from 'react'
+import { useState } from 'react'
 
+import { getCurrentUser, login } from '../api/auth'
 import AnimatedLogo from '../components/AnimatedLogo'
+import SlidingSnackbar from '../components/SlidingSnackbar'
+import { useAuth } from '../providers/useAuth'
 
 export default function LoginPage() {
-  const handleSubmit: SubmitEventHandler<HTMLFormElement> = (event) => {
+  const auth = useAuth()
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
-    console.log('Form submitted')
+    const formData = new FormData(event.currentTarget)
+    const username = formData.get('username') as string
+    const password = formData.get('password') as string
+    try {
+      // login the user and retrieve tokens
+      const tokens = await login({ username, password })
+      // store the refresh token in local storage
+      localStorage.setItem("refresh_token", tokens.refresh_token);
+      // get the current user using the access token
+      const currentUser = await getCurrentUser(tokens.access_token)
+      // log the user in frontend by updating the auth context
+      auth.loginUser(currentUser, tokens.access_token)
+    } catch (error) {
+      console.error('Login failed', error)
+      setError('Login failed. Please check your credentials and try again.')
+    }
   }
+  
   return (
     <>
       <AnimatedLogo />
@@ -32,6 +55,13 @@ export default function LoginPage() {
           Login
         </Button>
       </Box>
+
+      <SlidingSnackbar
+        open={error !== null}
+        message={error}
+        severity="danger"
+        onClose={() => setError(null)}
+      />
     </>
   )
 }

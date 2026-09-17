@@ -1,5 +1,5 @@
 
-import type { RootData,RootResponse } from '../types/rootResponse'
+import type { RootData, RootResponse } from '../types/rootResponse'
 
 const homeLoader = async (): Promise<RootData> => {
     try {
