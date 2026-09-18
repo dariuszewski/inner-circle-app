@@ -154,6 +154,7 @@ async def test_regular_user_must_verify_before_accessing_protected_endpoints(
             "username": "unverified_user",
             "email": "unverified_user@example.com",
             "password": "StrongPass123!",
+            "password2": "StrongPass123!",
         },
     )
     assert register_response.status_code == 201
@@ -182,7 +183,11 @@ async def test_demo_user_registration_skips_verification(
 ) -> None:
     register_response = await client.post(
         "/api/users/register",
-        json={"username": "demo_user", "password": "StrongPass123!"},
+        json={
+            "username": "demo_user",
+            "password": "StrongPass123!",
+            "password2": "StrongPass123!",
+        },
     )
     assert register_response.status_code == 201
 
@@ -202,7 +207,11 @@ async def test_demo_user_can_register_email_and_verify_it(
 ) -> None:
     register_response = await client.post(
         "/api/users/register",
-        json={"username": "upgrading_demo", "password": "StrongPass123!"},
+        json={
+            "username": "upgrading_demo",
+            "password": "StrongPass123!",
+            "password2": "StrongPass123!",
+        },
     )
     assert register_response.status_code == 201
 
@@ -258,7 +267,11 @@ async def test_expired_demo_user_loses_access_but_keeps_me_endpoint(
 ) -> None:
     register_response = await client.post(
         "/api/users/register",
-        json={"username": "expired_demo", "password": "StrongPass123!"},
+        json={
+            "username": "expired_demo",
+            "password": "StrongPass123!",
+            "password2": "StrongPass123!",
+        },
     )
     assert register_response.status_code == 201
 
@@ -291,6 +304,7 @@ async def test_regular_user_normal_registration_flow(
             "username": "flow_user",
             "email": "flow_user@example.com",
             "password": "StrongPass123!",
+            "password2": "StrongPass123!",
         },
     )
     assert register_response.status_code == 201
@@ -370,7 +384,11 @@ async def test_register_responses(
         )
         await db_session.commit()
 
-    payload: dict[str, str] = {"username": username, "password": "StrongPass123!"}
+    payload: dict[str, str] = {
+        "username": username,
+        "password": "StrongPass123!",
+        "password2": "StrongPass123!",
+    }
     if email is not None:
         payload["email"] = email
 
@@ -406,7 +424,11 @@ async def test_register_demo_email_existing_email_returns_409(
 
     register_response = await client.post(
         "/api/users/register",
-        json={"username": "race_demo", "password": "StrongPass123!"},
+        json={
+            "username": "race_demo",
+            "password": "StrongPass123!",
+            "password2": "StrongPass123!",
+        },
     )
     assert register_response.status_code == 201
 
@@ -545,6 +567,7 @@ async def test_verify_registration_token_cannot_be_reused(
             "username": "verify_reuse_user",
             "email": "verify_reuse_user@example.com",
             "password": "StrongPass123!",
+            "password2": "StrongPass123!",
         },
     )
     verification_link = register_response.json()["verification_link"]
@@ -565,7 +588,11 @@ async def test_verify_demo_elevation_happy_path(
 ) -> None:
     register_response = await client.post(
         "/api/users/register",
-        json={"username": "demo_user", "password": "StrongPass123!"},
+        json={
+            "username": "demo_user",
+            "password": "StrongPass123!",
+            "password2": "StrongPass123!",
+        },
     )
     assert register_response.status_code == 201
 

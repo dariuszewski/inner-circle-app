@@ -11,6 +11,18 @@ type TokenResponse = {
     token_type: string;
 };
 
+type RegisterInput = {
+    username: string;
+    password: string;
+    password2: string;
+    email?: string;
+};
+
+type RegisterResponse = {
+    detail: string;
+    verification_link: string | null;
+};
+
 export async function getCurrentUser(accessToken: string): Promise<UserResponsePrivate> {
     const response = await fetch("/api/users/me", {
         headers: {
@@ -73,4 +85,20 @@ export async function logout(refreshToken: string): Promise<void> {
     if (!response.ok) {
         throw new Error('Failed to logout');
     }
+}
+
+export async function register({ username, password, password2, email }: RegisterInput): Promise<RegisterResponse> {
+    const response = await fetch('/api/users/register', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ username, password, password2, email })
+    });
+
+    if (!response.ok) {
+        throw new Error('Registration failed');
+    }
+
+    return response.json();
 }

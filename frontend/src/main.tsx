@@ -12,11 +12,13 @@ import AppLayout from './layouts/AppLayout.tsx';
 import GuestLayout from './layouts/GuestLayout.tsx';
 import RootLayout from './layouts/RootLayout.tsx';
 import homeLoader from './loaders/homeLoader.ts';
+import CheckEmailPage from './pages/CheckEmailPage.tsx';
 import CollectionListPage from './pages/CollectionListPage.tsx';
 import HomePage from './pages/HomePage.tsx';
 import LoginPage from './pages/LoginPage.tsx';
 import NotFoundPage from './pages/NotFoundPage.tsx';
 import RegisterPage from './pages/RegisterPage.tsx';
+import VerifiedPage from './pages/VerifiedPage.tsx';
 import { AuthProvider } from './providers/AuthContextProvider.tsx';
 
 const router = createBrowserRouter([
@@ -36,6 +38,14 @@ const router = createBrowserRouter([
           {
             path: '/register',
             element: <RegisterPage />,
+          },
+          {
+            path: '/check-email',
+            element: <CheckEmailPage />,
+          },
+          {
+            path: '/verify',
+            element: <VerifiedPage />,
           },
           {
             path: '/login',

@@ -2,7 +2,15 @@ from datetime import datetime
 from math import ceil
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, computed_field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    HttpUrl,
+    computed_field,
+    model_validator,
+)
 
 from config import settings
 from models import MediaType, ReactionType, UserRole
@@ -35,6 +43,13 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     email: EmailStr | None = None
     password: str = Field(min_length=8, max_length=128)
+    password2: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def passwords_match(self) -> "UserCreate":
+        if self.password != self.password2:
+            raise ValueError("Passwords do not match.")
+        return self
 
 
 class UserUpdate(BaseModel):

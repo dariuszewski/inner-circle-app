@@ -1,6 +1,7 @@
-import { Box, Button, TextField, Typography } from '@mui/material'
+import { Box, Button, Link, TextField, Typography } from '@mui/material'
 import type { SubmitEventHandler } from 'react'
 import { useState } from 'react'
+import { Link as RouterLink } from 'react-router'
 
 import { getCurrentUser, login } from '../api/auth'
 import AnimatedLogo from '../components/AnimatedLogo'
@@ -26,7 +27,7 @@ export default function LoginPage() {
       // log the user in frontend by updating the auth context
       auth.loginUser(currentUser, tokens.access_token)
     } catch (error) {
-      console.error('Login failed', error)
+      console.error(error)
       setError('Login failed. Please check your credentials and try again.')
     }
   }
@@ -55,6 +56,13 @@ export default function LoginPage() {
           Login
         </Button>
       </Box>
+
+      <Typography variant="body2" sx={{ mt: 2 }}>
+        No account yet?{' '}
+        <Link component={RouterLink} to="/register">
+          Register here
+        </Link>
+      </Typography>
 
       <SlidingSnackbar
         open={error !== null}

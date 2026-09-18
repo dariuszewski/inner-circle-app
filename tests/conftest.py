@@ -132,7 +132,12 @@ async def create_test_user(
 ) -> dict[str, Any]:
     response = await client.post(
         "/api/users/register",
-        json={"username": username, "email": email, "password": password},
+        json={
+            "username": username,
+            "email": email,
+            "password": password,
+            "password2": password,
+        },
     )
     assert response.status_code == 201
 
