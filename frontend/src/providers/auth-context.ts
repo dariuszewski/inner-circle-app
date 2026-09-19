@@ -9,6 +9,7 @@ export type AuthContextType = {
   loginUser: (user: UserResponsePrivate, accessToken: string) => void;
   logoutUser: () => void;
   updateAccessToken: (token: string) => void;
+  updateUser: (user: UserResponsePrivate) => void;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined)

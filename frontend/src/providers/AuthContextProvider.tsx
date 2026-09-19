@@ -45,6 +45,10 @@ export function AuthProvider({ children }: {children: ReactNode}) {
     setAccessToken(token);
   }
 
+  function updateUser(updatedUser: UserResponsePrivate) {
+    setUser(updatedUser);
+  }
+
   function loginUser(user: UserResponsePrivate, accessToken: string) {
     // this just sets up the internal state
     setUser(user);
@@ -75,6 +79,7 @@ export function AuthProvider({ children }: {children: ReactNode}) {
       loginUser,
       logoutUser,
       updateAccessToken,
+      updateUser,
     }}>
       {children}
     </AuthContext.Provider>

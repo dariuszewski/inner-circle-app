@@ -12,13 +12,19 @@ import AppLayout from './layouts/AppLayout.tsx';
 import GuestLayout from './layouts/GuestLayout.tsx';
 import RootLayout from './layouts/RootLayout.tsx';
 import homeLoader from './loaders/homeLoader.ts';
+import ChangeEmailPage from './pages/ChangeEmailPage.tsx';
 import CheckEmailPage from './pages/CheckEmailPage.tsx';
 import CollectionListPage from './pages/CollectionListPage.tsx';
+import ElevateDemoPage from './pages/ElevateDemoPage.tsx';
 import HomePage from './pages/HomePage.tsx';
 import LoginPage from './pages/LoginPage.tsx';
 import NotFoundPage from './pages/NotFoundPage.tsx';
 import RegisterPage from './pages/RegisterPage.tsx';
+import ResetPasswordPage from './pages/ResetPasswordPage.tsx';
+import SettingsPage from './pages/SettingsPage.tsx';
+import UpdateProfilePage from './pages/UpdateProfilePage.tsx';
 import VerifiedPage from './pages/VerifiedPage.tsx';
+import VerifiedProtectedPage from './pages/VerifiedProtectedPage.tsx';
 import { AuthProvider } from './providers/AuthContextProvider.tsx';
 
 const router = createBrowserRouter([
@@ -65,6 +71,30 @@ const router = createBrowserRouter([
       {
         path: '/collections',
         element: <CollectionListPage />,
+      },
+      {
+        path: '/settings',
+        element: <SettingsPage />,
+      },
+      {
+        path: '/settings/update-profile',
+        element: <UpdateProfilePage />,
+      },
+      {
+        path: '/settings/change-email',
+        element: <ChangeEmailPage />,
+      },
+      {
+        path: '/settings/reset-password',
+        element: <ResetPasswordPage />, 
+      },
+      {
+        path: '/settings/elevate-demo',
+        element: <ElevateDemoPage />,
+      },
+      {
+        path: '/settings/verify',
+        element: <VerifiedProtectedPage />,
       },
     ],
   }

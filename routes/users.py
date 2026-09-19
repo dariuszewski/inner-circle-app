@@ -248,6 +248,18 @@ async def update_user(
     user = await db.get(User, current_user.id)
     assert user is not None
 
+    # check if the new username is already taken
+    existing_user = await db.scalar(
+        select(User).where(
+            func.lower(User.username) == user_update.username.strip().lower()
+        )
+    )
+    if existing_user is not None and existing_user.id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username already in use.",
+        )
+
     user.username = user_update.username.strip()
     await db.commit()
     await db.refresh(user)
@@ -272,6 +284,16 @@ async def change_user_email(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="New email cannot be the same as the current email.",
+        )
+
+    # check if user with the new email already exists
+    existing_user = await db.scalar(
+        select(User).where(func.lower(User.email) == future_email)
+    )
+    if existing_user is not None and existing_user.id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already in use.",
         )
 
     raw_token, token_hash, expires_at = create_verification_token()

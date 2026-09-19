@@ -1,11 +1,25 @@
 import { Box, CircularProgress, Link, Typography } from '@mui/material'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link as RouterLink, useSearchParams } from 'react-router'
 
 import { verifyVerificationToken } from '../api/verification'
 import AnimatedLogo from '../components/AnimatedLogo'
 
 type VerificationStatus = 'pending' | 'success' | 'error'
+
+type VerifiedPageProps = {
+  /** token to verify; falls back to the `?token=` search param when omitted */
+  token?: string | null
+  pendingTitle?: string
+  successTitle?: string
+  /** success body shown when the backend returns no detail message */
+  successFallback?: string
+  /** footer link; pass null to hide it */
+  footerLink?: { to: string; label: string } | null
+  showLogo?: boolean
+  /** called after the verification request succeeds (e.g. to refresh auth state) */
+  onVerified?: () => void
+}
 
 // tokens are single-use, so dedupe the request across StrictMode's
 // double-invoked effects (and accidental remounts) by caching the promise
@@ -22,26 +36,39 @@ function verifyOnce(token: string) {
   return promise
 }
 
-export default function VerifiedPage() {
+export default function VerifiedPage({
+  token: tokenProp,
+  pendingTitle = 'Verifying your account...',
+  successTitle = 'Thank you!',
+  successFallback = 'Your account is now verified. You can log in and start using the app.',
+  footerLink = { to: '/login', label: 'Go to login' },
+  showLogo = true,
+  onVerified,
+}: VerifiedPageProps) {
   const [searchParams] = useSearchParams()
-  const token = searchParams.get('token')
+  const token = tokenProp ?? searchParams.get('token')
   const [status, setStatus] = useState<VerificationStatus>(token ? 'pending' : 'error')
   const [message, setMessage] = useState<string>(token ? '' : 'No verification token provided.')
+
+
+const onVerifiedRef = useRef(onVerified)
+
+  useEffect(() => {
+    onVerifiedRef.current = onVerified
+  }, [onVerified])
 
   useEffect(() => {
     if (!token) {
       return
     }
 
-    // StrictMode double-invokes effects in dev: the first run's cleanup sets
-    // `cancelled = true`, then the effect re-runs with a live flag. Both runs
-    // share the same request via verifyOnce, so only one HTTP call is made.
     let cancelled = false
     verifyOnce(token)
       .then((response) => {
         if (cancelled) return
         setStatus('success')
         setMessage(response.detail)
+        onVerifiedRef.current?.()
       })
       .catch((err) => {
         if (cancelled) return
@@ -56,11 +83,11 @@ export default function VerifiedPage() {
 
   return (
     <>
-      <AnimatedLogo />
+      {showLogo && <AnimatedLogo />}
       {status === 'pending' && (
         <>
           <Typography variant="h4" component="h1">
-            Verifying your account...
+            {pendingTitle}
           </Typography>
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
             <CircularProgress />
@@ -71,10 +98,10 @@ export default function VerifiedPage() {
       {status === 'success' && (
         <>
           <Typography variant="h4" component="h1">
-            Thank you!
+            {successTitle}
           </Typography>
           <Typography variant="body1" sx={{ mt: 2 }}>
-            Your account is now verified. You can log in and start using the app.
+            {message || successFallback}
           </Typography>
         </>
       )}
@@ -90,11 +117,13 @@ export default function VerifiedPage() {
         </>
       )}
 
-      <Typography variant="body2" sx={{ mt: 2 }}>
-        <Link component={RouterLink} to="/login">
-          Go to login
-        </Link>
-      </Typography>
+      {footerLink && (
+        <Typography variant="body2" sx={{ mt: 2 }}>
+          <Link component={RouterLink} to={footerLink.to}>
+            {footerLink.label}
+          </Link>
+        </Typography>
+      )}
     </>
   )
 }

@@ -1,11 +1,13 @@
 import LogoutIcon from '@mui/icons-material/Logout'
-import { AppBar, Box, Container, IconButton, Paper, Toolbar, Typography } from '@mui/material'
-import { Navigate,Outlet } from 'react-router'
+import SettingsIcon from '@mui/icons-material/Settings'
+import { AppBar, Box, Container, Divider, IconButton, Paper, Toolbar, Typography } from '@mui/material'
+import { Navigate,Outlet,useNavigate } from 'react-router'
 
 import innerCircleLogo from '../assets/logo.svg'
 import { useAuth } from '../providers/useAuth'
 
 export default function AppLayout() {
+  const navigate = useNavigate();
   const {
     user,
     isLoading,
@@ -38,9 +40,18 @@ export default function AppLayout() {
         }}
       >
         <AppBar position="static" color="transparent" elevation={0}>
-          <Toolbar sx={{ minHeight: 'auto' }}>
-            <Box sx={{ flex: 1 }} />
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Toolbar disableGutters sx={{ minHeight: 'auto' }}>
+            <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
+              <IconButton edge="start" aria-label="settings" onClick={() => navigate('/settings')}>
+                <SettingsIcon />
+              </IconButton>
+            </Box>
+            <Box
+              role="link"
+              aria-label="back to collections"
+              onClick={() => navigate('/collections')}
+              sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+            >
               <Typography variant="h6" component="span">
                 INNER
               </Typography>
@@ -61,6 +72,7 @@ export default function AppLayout() {
             </Box>
           </Toolbar>
         </AppBar>
+        <Divider sx={{ mb: 2, mt: 0 }} />
         <Outlet />
       </Paper>
     </Container>
