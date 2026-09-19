@@ -10,7 +10,8 @@ import { useAuth } from '../providers/useAuth'
 
 export default function LoginPage() {
   const auth = useAuth()
-  const [error, setError] = useState<string | null>(null)
+  // const [error, setError] = useState<string | null>(null)
+  const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'danger' } | null>(null)
 
   const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
@@ -28,8 +29,13 @@ export default function LoginPage() {
       auth.loginUser(currentUser, tokens.access_token)
     } catch (error) {
       console.error(error)
-      setError('Login failed. Please check your credentials and try again.')
+      setSnackbar({ message: 'Login failed. Please check your credentials and try again.', severity: 'danger' })
     }
+  }
+
+  const handleResetPassword = () => {
+    // Implement the reset password logic here
+    setSnackbar({ message: 'Feature not implemented yet', severity: 'danger' })
   }
   
   return (
@@ -64,11 +70,18 @@ export default function LoginPage() {
         </Link>
       </Typography>
 
+      <Typography variant="body2" sx={{ mt: 2 }}>
+        Forgot your password?{' '}
+        <Typography component={Link} onClick={handleResetPassword}>
+          Reset it here
+        </Typography>
+      </Typography>
+
       <SlidingSnackbar
-        open={error !== null}
-        message={error}
-        severity="danger"
-        onClose={() => setError(null)}
+        open={snackbar !== null}
+        message={snackbar?.message}
+        severity={snackbar?.severity ?? 'info'}
+        onClose={() => setSnackbar(null)}
       />
     </>
   )
