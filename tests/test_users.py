@@ -1,5 +1,6 @@
 import os
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
@@ -456,18 +457,50 @@ async def test_verify_registration_invalid_token_returns_400(
 
 
 @pytest.mark.anyio
-async def test_update_user(client: AsyncClient) -> None:
-    await create_test_user(client, "user", "user@example.com", "StrongPass123!")
-    token = await login_user(client, "user", "StrongPass123!")
-    headers = auth_header(token["access_token"])
-
-    await client.patch(
-        "/api/users/update", json={"username": "updated_user"}, headers=headers
+async def test_update_user(
+    client: AsyncClient,
+    mock_s3_client: AsyncMock,
+) -> None:
+    await create_test_user(
+        client,
+        "user",
+        "user@example.com",
+        "StrongPass123!",
     )
 
-    me_response = await client.get("/api/users/me", headers=headers)
+    token = await login_user(
+        client,
+        "user",
+        "StrongPass123!",
+    )
+
+    headers = auth_header(token["access_token"])
+
+    response = await client.patch(
+        "/api/users/update",
+        data={"username": "updated_user"},
+        files={
+            "profile_image": (
+                "avatar.jpg",
+                b"fake-image-bytes",
+                "image/jpeg",
+            )
+        },
+        headers=headers,
+    )
+    print(response.status_code)
+    print(response.json())
+    assert response.status_code == 200
+
+    mock_s3_client.put_object.assert_awaited_once()
+
+    me_response = await client.get(
+        "/api/users/me",
+        headers=headers,
+    )
 
     assert me_response.json()["username"] == "updated_user"
+    assert me_response.json()["profile_image_url"] is not None
 
 
 @pytest.mark.anyio

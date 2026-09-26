@@ -27,6 +27,7 @@ async def get_media_type(raw_media_type: str | None) -> str:
         raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
 
 
+# TBD - local file upload to be removed entirely and replaced by s3
 async def upload_file(file: UploadFile, file_path: pathlib.Path) -> pathlib.Path:
 
     try:

@@ -21,8 +21,15 @@ class Settings(BaseSettings):
     verification_token_expire_hours: int = 24
 
     # Database settings
-    database_url: str = "sqlite+aiosqlite:///./dev.db"
+    database_url: str = "postgresql+asyncpg://ic_user:ic_password@localhost:5432/ic_db"
     test_database_url: str = "sqlite+aiosqlite://"
+
+    # Storage settings
+    storage_url: str = "http://storage:8333"
+    storage_bucket_profile_pictures: str = "profile-pictures"
+    storage_access_key: str = "inner_circle"
+    storage_secret_key: str = "inner_circle"
+    storage_region: str = "us-east-1"
 
     # Superuser settings
     superuser_username: str = "admin"

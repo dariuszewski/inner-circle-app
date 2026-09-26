@@ -5,4 +5,5 @@ export type UserResponsePrivate = {
   is_verified: boolean;
   user_role: string;
   created_at: string;
+  profile_image_url: string | null;
 };

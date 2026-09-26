@@ -135,6 +135,7 @@ When changing SQLAlchemy models:
 - `models.py` - SQLAlchemy models
 - `schemas.py` - Pydantic schemas
 - `database.py` - Database configuration
+- `storage.py` - Storage configuration
 - `config.py` - Application settings & environment configuration
 - `frontend/` - React TypeScript PWA frontend
 - `utils/` - Helper utilities (auth, bootstrap, email, logging, media)
@@ -168,6 +169,11 @@ DEBUG=True
 DEMO_ALLOWED_DAYS=7
 MAX_UPLOAD_SIZE_BYTES=10485760
 MAX_DATA_STORAGE_PER_USER_BYTES=1073741824
+STORAGE_URL=http://storage:8333
+STORAGE_BUCKET_PROFILE_PICTURES=profile-pictures
+STORAGE_ACCESS_KEY=inner_circle
+STORAGE_SECRET_KEY=inner_circle
+STORAGE_REGION=us-east-1
 ```
 
 
@@ -204,3 +210,7 @@ uv run pre-commit run
 The local setup uses PostgreSQL through Docker. Uploaded files are stored in the `uploads/` directory.
 
 The local development environment serves the frontend in a separate container with hot reloading (`npm run dev`). In production (such as FastAPI Cloud), the frontend is served directly by FastAPI from `frontend/dist/`. Therefore, any frontend changes must be built (`cd frontend && npm run build`) and pushed to Git so the updated `frontend/dist/` directory is deployed. 
+
+Adding a new dependency in the frontend requires running `docker compose up --build --force-recreate --renew-anon-volumes frontend`
+
+Updating a remote database requires setting up a new uri. You can paste it in the `config.py` to run commands. No CI/CD is in place yet.

@@ -52,10 +52,6 @@ class UserCreate(UserBase):
         return self
 
 
-class UserUpdate(BaseModel):
-    username: str = Field(min_length=3, max_length=30)
-
-
 class UserUpdateEmail(BaseModel):
     email: EmailStr
 
@@ -65,6 +61,17 @@ class UserRetrievePublic(UserBase):
 
     id: int
     created_at: datetime
+    profile_image: str | None = Field(default=None, exclude=True)
+
+    @computed_field
+    def profile_image_url(self) -> HttpUrl | None:
+        if self.profile_image:
+            base_url = settings.base_url
+            endpoint = "/api/users/profile-image"
+            blob = self.profile_image
+            return HttpUrl(f"{base_url}{endpoint}/{blob}")
+        else:
+            return None
 
 
 class UserRetrievePrivate(UserRetrievePublic):

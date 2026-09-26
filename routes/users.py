@@ -1,15 +1,21 @@
 import uuid
 from datetime import UTC, datetime
 from math import ceil
-from typing import Annotated
+from typing import Annotated, Union
 
+from aiobotocore.client import AioBaseClient
 from fastapi import (
     APIRouter,
     BackgroundTasks,
     Body,
     Depends,
+    File,
+    Form,
     HTTPException,
+    Path,
     Query,
+    Response,
+    UploadFile,
     status,
 )
 from fastapi.security import OAuth2PasswordRequestForm
@@ -19,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from database import get_db
 from models import (
+    MediaType,
     RefreshToken,
     User,
     UserCollection,
@@ -34,10 +41,10 @@ from schemas import (
     UserCreate,
     UserRetrievePrivate,
     UserRetrievePublic,
-    UserUpdate,
     UserUpdateEmail,
     VerificationRequestResponse,
 )
+from storage import get_storage
 from utils.auth import (
     create_access_token,
     create_refresh_token,
@@ -52,6 +59,8 @@ from utils.auth import (
     verify_password,
 )
 from utils.email import send_welcome_email
+from utils.logging_config import logger
+from utils.media import get_media_type, get_upload_file_size
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -126,6 +135,34 @@ async def get_user(
     query = await db.execute(select(User).where(User.id == user_id))
     user = query.scalar_one_or_none()
     return UserRetrievePublic.model_validate(user)
+
+
+@router.get("/profile-image/{profile_image:str}")
+async def get_profile_image(
+    s3: Annotated[AioBaseClient, Depends(get_storage)],
+    profile_image: Annotated[str, Path()],
+) -> Union["Response | dict | None"]:
+    if not profile_image:
+        return None
+
+    bucket_name = settings.storage_bucket_profile_pictures
+
+    try:
+        response = await s3.get_object(
+            Bucket=bucket_name,
+            Key=profile_image,
+        )
+
+    except s3.exceptions.NoSuchKey as e:
+        logger.info(f"Profile image not found: {e}")
+        return None
+
+    content = await response["Body"].read()
+
+    return Response(
+        content=content,
+        media_type=response.get("ContentType", "application/octet-stream"),
+    )
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -241,26 +278,78 @@ async def register_demo_user_as_regular(
 @router.patch("/update")
 async def update_user(
     db: Annotated[AsyncSession, Depends(get_db)],
+    s3: Annotated[AioBaseClient, Depends(get_storage)],
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_active_user)],
-    user_update: Annotated[UserUpdate, Body()],
+    username: Annotated[str | None, Form()] = None,
+    profile_image: Annotated[UploadFile | None, File()] = None,
 ) -> UserRetrievePrivate:
 
     user = await db.get(User, current_user.id)
     assert user is not None
 
     # check if the new username is already taken
-    existing_user = await db.scalar(
-        select(User).where(
-            func.lower(User.username) == user_update.username.strip().lower()
+    if username is not None:
+        existing_user = await db.scalar(
+            select(User).where(func.lower(User.username) == username.strip().lower())
         )
-    )
-    if existing_user is not None and existing_user.id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Username already in use.",
-        )
+        if existing_user is not None and existing_user.id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Username already in use.",
+            )
+        else:
+            user.username = username.strip()
 
-    user.username = user_update.username.strip()
+    if profile_image is not None:
+        # check if uploaded file is the correct type
+        filetype = await get_media_type(profile_image.content_type)
+        if filetype != MediaType.IMAGE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file type. Only image files are allowed.",
+            )
+
+        # check if uploaded file is correct size
+        if await get_upload_file_size(profile_image) > settings.max_upload_size_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File size exceeds {settings.max_upload_size_bytes} bytes.",
+            )
+
+        # create a random name for the profile image
+        profile_image_name = f"{uuid.uuid4()}.jpg"
+
+        # upload the profile image to S3
+        logger.info(f"Uploading profile image with name: {profile_image_name}")
+        try:
+            await s3.put_object(
+                Bucket=settings.storage_bucket_profile_pictures,
+                Key=profile_image_name,
+                Body=await profile_image.read(),
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload profile image: {str(e)}",
+            ) from None
+
+        # retrieve current profile picture
+        current_profile_image = user.profile_image
+
+        # replace the current profile image with the new one
+        user.profile_image = profile_image_name
+
+        # delete the old profile image from S3 if it exists
+        if current_profile_image:
+            logger.info(f"Deleting old profile image: {current_profile_image}")
+            try:
+                await s3.delete_object(
+                    Bucket=settings.storage_bucket_profile_pictures,
+                    Key=current_profile_image,
+                )
+            except Exception as e:
+                logger.exception(f"Failed to delete old profile image: {str(e)}")
+
     await db.commit()
     await db.refresh(user)
 

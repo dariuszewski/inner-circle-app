@@ -4,11 +4,15 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
+from aiobotocore.client import AioBaseClient
 from fastapi import (
+    Depends,
     FastAPI,
     Header,
     HTTPException,
     Request,
+    Response,
+    UploadFile,
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +25,7 @@ from models import Base
 from routes.collections import router as collection_router
 from routes.media import router as media_router
 from routes.users import router as user_router
+from storage import get_storage
 from utils.bootstrap import ensure_superuser
 from utils.logging_config import logger, request_id_context
 
@@ -51,6 +56,7 @@ app.include_router(user_router, prefix="/api")
 app.include_router(collection_router, prefix="/api")
 app.include_router(media_router, prefix="/api")
 
+# TBD - static files to be remvoed entirely and replaced by s3
 app.mount(
     settings.uploads_mount_path,
     StaticFiles(directory=settings.upload_directory),
@@ -93,6 +99,70 @@ async def read_root(
         return {"message": "Witaj, Świecie!"}
 
     return {"message": "Hello, World!"}
+
+
+# TBD - s3 endpoints to be removed eventually
+
+
+@app.post("/api/create_bucket")
+async def create_bucket(
+    bucket_name: str, s3: Annotated[AioBaseClient, Depends(get_storage)]
+) -> dict:
+    await s3.create_bucket(Bucket=bucket_name)
+
+    return {"message": f"Bucket '{bucket_name}' created successfully."}
+
+
+@app.get("/api/list_buckets")
+async def list_buckets(s3: Annotated[AioBaseClient, Depends(get_storage)]) -> dict:
+    response = await s3.list_buckets()
+    print(response)
+    return {"buckets": response}
+
+
+@app.get("/api/get_bucket")
+async def get_bucket(
+    bucket_name: str, s3: Annotated[AioBaseClient, Depends(get_storage)]
+) -> dict:
+    response = await s3.head_bucket(Bucket=bucket_name)
+    return {"exists": response["ResponseMetadata"]["HTTPStatusCode"] == 200}
+
+
+@app.post("/api/upload_file")
+async def upload_file(
+    bucket_name: str,
+    file: UploadFile,
+    s3: Annotated[AioBaseClient, Depends(get_storage)],
+) -> dict:
+    await s3.put_object(Bucket=bucket_name, Key=file.filename, Body=await file.read())
+    return {"message": f"File '{file.filename}' uploaded successfully."}
+
+
+@app.get("/api/files/{bucket_name}/{file_name}")
+async def get_file(
+    bucket_name: str,
+    file_name: str,
+    s3: Annotated[AioBaseClient, Depends(get_storage)],
+) -> Response:
+    response = await s3.get_object(
+        Bucket=bucket_name,
+        Key=file_name,
+    )
+
+    content = await response["Body"].read()
+
+    return Response(
+        content=content,
+        media_type=response.get("ContentType", "application/octet-stream"),
+    )
+
+
+@app.delete("/api/delete_bucket")
+async def delete_bucket(
+    bucket_name: str, s3: Annotated[AioBaseClient, Depends(get_storage)]
+) -> dict:
+    await s3.delete_bucket(Bucket=bucket_name)
+    return {"message": f"Bucket '{bucket_name}' deleted successfully."}
 
 
 frontend_dist = pathlib.Path(__file__).parent / "frontend" / "dist"

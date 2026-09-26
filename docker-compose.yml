@@ -11,6 +11,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  storage:
+    image: chrislusf/seaweedfs:latest
+    container_name: inner_circle_storage
+    command: server -s3 -s3.config=/etc/seaweedfs/s3.json -dir=/data
+    ports:
+      - "8333:8333"
+    volumes:
+      - seaweedfs_data:/data
+      - ./s3-dev-config.yml:/etc/seaweedfs/s3.json:ro
+
   backend:
     build:
       context: .
@@ -19,9 +29,16 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
+      db:
+        condition: service_started
+      storage:
+        condition: service_started
     environment:
       - DATABASE_URL=postgresql+asyncpg://ic_user:ic_password@db:5432/ic_db
+      - STORAGE_URL=http://storage:8333
+      - STORAGE_BUCKET=inner-circle
+      - STORAGE_ACCESS_KEY=inner_circle
+      - STORAGE_SECRET_KEY=inner_circle
     volumes:
       - .:/app
       # Mask the host virtualenv directory (Windows .venv) so container operations
@@ -47,4 +64,4 @@ services:
 volumes:
   postgres_data:
   backend_venv:
-  
+  seaweedfs_data:

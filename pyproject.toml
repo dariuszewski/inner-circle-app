@@ -5,6 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "aioboto3>=15.5.0",
+    "aiobotocore>=2.25.1",
     "aiosqlite>=0.22.1",
     "alembic>=1.19.2",
     "asyncpg>=0.31.0",
@@ -50,6 +52,13 @@ warn_unused_ignores = true
 warn_return_any = true
 show_error_codes = true
 pretty = true
+
+[[tool.mypy.overrides]]
+module = [
+    "aioboto3.*",
+    "aiobotocore.*",
+]
+ignore_missing_imports = true
 
 [dependency-groups]
 dev = [

@@ -1,0 +1,20 @@
+{
+  "identities": [
+    {
+      "name": "inner-circle-backend",
+      "credentials": [
+        {
+          "accessKey": "inner_circle",
+          "secretKey": "inner_circle"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List",
+        "Tagging"
+      ]
+    }
+  ]
+}

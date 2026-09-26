@@ -44,6 +44,7 @@ type DeletionResult = {
 
 export default function SettingsPage() {
   const auth = useAuth()
+  console.log(auth.user)
   const navigate = useNavigate()
   const [snackbar, setSnackbar] = useState<SnackbarState | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -90,9 +91,12 @@ export default function SettingsPage() {
         sx={{ p: 1, borderRadius: 2, backgroundImage: 'none', backgroundColor: '#24242659', mb: 2 }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mx: 1 }}>
-          <Avatar sx={{ width: 56, height: 56 }}>
-            <AccountCircleIcon />
-          </Avatar>
+        <Avatar
+          src={auth.user?.profile_image_url ?? undefined}
+          sx={{ width: 56, height: 56 }}
+        >
+          <AccountCircleIcon />
+        </Avatar>
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography variant="subtitle1" component="div">
               {auth.user?.username}
@@ -115,7 +119,7 @@ export default function SettingsPage() {
             <ListItemIcon>
               <BadgeIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText>Change username</ListItemText>
+            <ListItemText>Update Profile</ListItemText>
             <ChevronRightIcon fontSize="small" color="action" />
           </ListItemButton>
           <ListItemButton onClick={() => navigate('/settings/change-email')}>

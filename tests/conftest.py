@@ -2,6 +2,7 @@ import os
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 from typing import Any, cast
+from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
@@ -17,6 +18,7 @@ from sqlalchemy.pool import NullPool
 from database import get_db
 from main import app
 from models import Base, User, UserCollection, UserRole
+from storage import get_storage
 from utils.auth import get_password_hash
 
 pytest_plugins = ["anyio"]
@@ -36,6 +38,14 @@ os.environ["LOG_FILE"] = "requests.log"
 os.environ["LOG_MAX_BYTES"] = "1048576"
 os.environ["LOG_BACKUP_COUNT"] = "3"
 os.environ["DEBUG"] = "True"
+os.environ["DEMO_ALLOWED_DAYS"] = "7"
+os.environ["MAX_UPLOAD_SIZE_BYTES"] = "10485760"
+os.environ["MAX_DATA_STORAGE_PER_USER_BYTES"] = "1073741824"
+os.environ["STORAGE_URL"] = "http://storage:8333"
+os.environ["STORAGE_BUCKET_PROFILE_PICTURES"] = "profile-pictures"
+os.environ["STORAGE_ACCESS_KEY"] = "inner_circle"
+os.environ["STORAGE_SECRET_KEY"] = "inner_circle"
+os.environ["STORAGE_REGION"] = "us-east-1"
 
 
 @pytest.fixture(scope="session")
@@ -95,12 +105,26 @@ async def db_session(
             await conn.close()
 
 
+@pytest.fixture
+def mock_s3_client() -> AsyncMock:
+    mock_client = AsyncMock()
+    mock_client.put_object = AsyncMock(return_value={})
+    mock_client.delete_object = AsyncMock(return_value={})
+    return mock_client
+
+
 @pytest.fixture(scope="function")
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def client(
+    db_session: AsyncSession, mock_s3_client: AsyncMock
+) -> AsyncGenerator[AsyncClient, None]:
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
+    async def override_get_storage() -> AsyncGenerator[AsyncMock, None]:
+        yield mock_s3_client
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_storage] = override_get_storage
 
     async with AsyncClient(
         transport=ASGITransport(app=app),

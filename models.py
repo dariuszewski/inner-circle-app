@@ -88,6 +88,11 @@ class User(Base):
         default=UserRole.REGULAR,
     )
 
+    profile_image: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
     owned_collections: Mapped[list["Collection"]] = relationship(
         back_populates="created_by",
         passive_deletes=True,
