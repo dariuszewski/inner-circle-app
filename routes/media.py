@@ -2,11 +2,13 @@ import pathlib
 from typing import Annotated
 from uuid import uuid4
 
+from aiobotocore.client import AioBaseClient
 from fastapi import (
     APIRouter,
     Depends,
     File,
     HTTPException,
+    Response,
     UploadFile,
     status,
 )
@@ -26,15 +28,64 @@ from models import (
     UserCollection,
 )
 from schemas import CommentCreate, MediaRetrieve, MediaRetrieveDetailed, ReactionCreate
+from storage import get_storage
 from utils.auth import get_current_user
-from utils.media import get_media_type, get_upload_file_size, upload_file
+from utils.media import get_media_type, get_upload_file_size
 
 router = APIRouter(
     prefix="/media",
     tags=["media"],
 )
 
-UPLOAD_DIRECTORY: pathlib.Path = pathlib.Path(settings.upload_directory)
+
+@router.get("/media-object/{collection_id:int}/{filename:str}")
+async def get_media_object(
+    collection_id: int,
+    filename: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    s3: Annotated[AioBaseClient, Depends(get_storage)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+
+    print(current_user)
+
+    # check if the user has access to the collection
+    stmt = select(Collection).where(
+        Collection.id == collection_id,
+        Collection.id.in_(
+            select(UserCollection.collection_id).where(
+                UserCollection.user_id == current_user.id
+            )
+        ),
+    )
+    collection = await db.scalar(stmt)
+
+    if collection is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Collection not found or access denied.",
+        )
+
+    try:
+        response = await s3.get_object(
+            Bucket=settings.storage_bucket_collections,
+            Key=f"{collection_id}/{filename}",
+        )
+    except s3.exceptions.NoSuchKey as e:
+        raise HTTPException(
+            status_code=404,
+            detail="Media not found",
+        ) from e
+
+    content = await response["Body"].read()
+
+    return Response(
+        content=content,
+        media_type=response.get(
+            "ContentType",
+            "application/octet-stream",
+        ),
+    )
 
 
 @router.get("/{media_id}")
@@ -87,6 +138,7 @@ async def upload_media(
         ],
         File(description="Select one or more files"),
     ],
+    s3: Annotated[AioBaseClient, Depends(get_storage)],
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> list[MediaRetrieve]:
@@ -151,9 +203,17 @@ async def upload_media(
         extension = pathlib.Path(file.filename or "").suffix.lower()
         file_name = f"{uuid4()}{extension}"
 
-        file_path = UPLOAD_DIRECTORY / file_name
-
-        await upload_file(file, file_path)
+        try:
+            await s3.put_object(
+                Bucket=settings.storage_bucket_collections,
+                Key=f"{collection_id}/{file_name}",
+                Body=await file.read(),
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload file to storage: {str(e)}",
+            ) from e
 
         media_obj = Media(
             file_path=file_name,
@@ -178,6 +238,7 @@ async def upload_media(
 async def delete_media(
     media_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
+    s3: Annotated[AioBaseClient, Depends(get_storage)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> None:
     stmt = (
@@ -200,18 +261,19 @@ async def delete_media(
             detail="Media not found or access denied.",
         )
 
-    stored_path = pathlib.Path(media.file_path)
-    if not stored_path.is_absolute() and (
-        len(stored_path.parts) == 0 or stored_path.parts[0] != UPLOAD_DIRECTORY.name
-    ):
-        file_path = UPLOAD_DIRECTORY / stored_path
-    else:
-        file_path = stored_path
+    try:
+        await s3.delete_object(
+            Bucket=settings.storage_bucket_collections,
+            Key=f"{media.collection_id}/{media.file_path}",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete file from storage: {str(e)}",
+        ) from e
 
     await db.delete(media)
     await db.commit()
-
-    file_path.unlink(missing_ok=True)
 
 
 @router.post("/comment/{media_id}", status_code=status.HTTP_201_CREATED)

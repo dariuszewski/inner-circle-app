@@ -1,11 +1,10 @@
 import io
-import pathlib
 
 import pytest
 from fastapi import HTTPException, UploadFile, status
 
 from models import MediaType
-from utils.media import get_media_type, upload_file
+from utils.media import get_media_type
 
 
 @pytest.mark.anyio
@@ -41,16 +40,3 @@ class FakeUploadFile(UploadFile):
             filename="fake.bin",
             headers=None,
         )
-
-
-@pytest.mark.anyio
-async def test_upload_file_writes_bytes_and_closes_stream(
-    tmp_path: pathlib.Path,
-) -> None:
-    fake_file = FakeUploadFile([b"hello ", b"world", b""])
-    file_path = tmp_path / "uploaded.bin"
-
-    result = await upload_file(fake_file, file_path)
-
-    assert result == file_path
-    assert file_path.read_bytes() == b"hello world"

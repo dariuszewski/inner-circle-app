@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     # Storage settings
     storage_url: str = "http://storage:8333"
     storage_bucket_profile_pictures: str = "profile-pictures"
+    storage_bucket_collections: str = "collections"
     storage_access_key: str = "inner_circle"
     storage_secret_key: str = "inner_circle"
     storage_region: str = "us-east-1"
@@ -46,8 +47,6 @@ class Settings(BaseSettings):
     cors_allow_headers: list[str] = ["*"]
 
     # Media settings
-    upload_directory: str = "uploads"
-    uploads_mount_path: str = "/uploads"
     base_url: str = "http://localhost:8000"
     max_upload_size_bytes: int = 10485760
     max_data_storage_per_user_bytes: int = 1073741824

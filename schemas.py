@@ -130,9 +130,11 @@ class MediaRetrieve(MediaBase):
 
     @computed_field
     def media_url(self) -> HttpUrl:
-        base_url = f"{settings.base_url}/uploads/"
-        normalized_path = self.file_path.replace("\\", "/").lstrip("/")
-        return HttpUrl(f"{base_url}{normalized_path}")
+        base_url = settings.base_url
+        endpoint = "/api/media/media-object"
+        collection_id = self.collection_id
+        blob = self.file_path
+        return HttpUrl(f"{base_url}{endpoint}/{collection_id}/{blob}")
 
 
 class MediaRetrieveDetailed(MediaRetrieve):
