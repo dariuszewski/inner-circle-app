@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 from math import ceil
-from typing import Annotated, Union
+from typing import Annotated
 
 from aiobotocore.client import AioBaseClient
 from fastapi import (
@@ -137,31 +137,33 @@ async def get_user(
     return UserRetrievePublic.model_validate(user)
 
 
-@router.get("/profile-image/{profile_image:str}")
+@router.get(
+    "/profile-image/{profile_image:str}",
+    response_model=None,
+)
 async def get_profile_image(
     s3: Annotated[AioBaseClient, Depends(get_storage)],
     profile_image: Annotated[str, Path()],
-) -> Union["Response | dict | None"]:
-    if not profile_image:
-        return None
-
-    bucket_name = settings.storage_bucket_profile_pictures
-
+) -> Response:
     try:
         response = await s3.get_object(
-            Bucket=bucket_name,
+            Bucket=settings.storage_bucket_profile_pictures,
             Key=profile_image,
         )
-
     except s3.exceptions.NoSuchKey as e:
-        logger.info(f"Profile image not found: {e}")
-        return None
+        raise HTTPException(
+            status_code=404,
+            detail="Profile image not found",
+        ) from e
 
     content = await response["Body"].read()
 
     return Response(
         content=content,
-        media_type=response.get("ContentType", "application/octet-stream"),
+        media_type=response.get(
+            "ContentType",
+            "application/octet-stream",
+        ),
     )
 
 

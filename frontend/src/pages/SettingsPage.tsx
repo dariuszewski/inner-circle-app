@@ -44,7 +44,6 @@ type DeletionResult = {
 
 export default function SettingsPage() {
   const auth = useAuth()
-  console.log(auth.user)
   const navigate = useNavigate()
   const [snackbar, setSnackbar] = useState<SnackbarState | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
