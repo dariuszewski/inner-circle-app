@@ -7,7 +7,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
   Pagination,
   TextField,
   Typography,
@@ -16,6 +15,7 @@ import { useState } from 'react'
 
 import { createCollection } from '../api/collection'
 import CollectionListItemCard from '../components/CollectionListItemCard'
+import CustomIconButton from '../components/CustomIconButton'
 import SlidingSnackbar from '../components/SlidingSnackbar'
 import { useCollections } from '../hooks/useCollections'
 import { useAuth } from '../providers/useAuth'
@@ -92,22 +92,12 @@ export default function CollectionListPage() {
           My Collections ({data?.total_items ?? 0})
         </Typography>
 
-        <IconButton
+        <CustomIconButton
           onClick={handleOpen}
-          aria-label="add collection"
-          sx={{
-            backgroundColor: 'primary.main',
-            color: 'white',
-            borderRadius: '50%',
-            width: 40,
-            height: 40,
-            '&:hover': {
-              backgroundColor: 'primary.dark',
-            },
-          }}
+          ariaLabel="add collection"
         >
           <AddIcon />
-        </IconButton>
+        </CustomIconButton>
       </Box>
 
       {data?.total_items === 0 ? (
@@ -136,6 +126,7 @@ export default function CollectionListPage() {
           {data?.items?.map((collection) => (
             <CollectionListItemCard
               key={collection.id}
+              id={collection.id}
               title={collection.name}
               body={collection.description}
               imageSrc={collection.cover_image?.media_url}

@@ -15,6 +15,7 @@ import homeLoader from './loaders/homeLoader.ts';
 import ChangeEmailPage from './pages/ChangeEmailPage.tsx';
 import CheckEmailPage from './pages/CheckEmailPage.tsx';
 import CollectionListPage from './pages/CollectionListPage.tsx';
+import CollectionPage from './pages/CollectionPage.tsx';
 import ElevateDemoPage from './pages/ElevateDemoPage.tsx';
 import HomePage from './pages/HomePage.tsx';
 import LoginPage from './pages/LoginPage.tsx';
@@ -71,6 +72,10 @@ const router = createBrowserRouter([
       {
         path: '/collections',
         element: <CollectionListPage />,
+      },
+      {
+        path: '/collections/:collectionId',
+        element: <CollectionPage />,
       },
       {
         path: '/settings',

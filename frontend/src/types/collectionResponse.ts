@@ -1,3 +1,5 @@
+import type { UserResponsePublic } from "./userResponse";
+
 export type MediaRetrieve = {
   id: number;
   file_path: string;
@@ -22,4 +24,12 @@ export type PaginatedResponse<T> = {
   per_page: number;
   total_pages: number;
   items: T[];
+};
+
+export type CollectionDetailedRetrieve = CollectionRetrieve & {
+  created_by_id: number;
+  created_by: UserResponsePublic;
+  members_count: number;
+  members: UserResponsePublic[];
+  media: PaginatedResponse<MediaRetrieve>
 };

@@ -7,3 +7,10 @@ export type UserResponsePrivate = {
   created_at: string;
   profile_image_url: string | null;
 };
+
+export type UserResponsePublic = {
+  username: string;
+  created_at: string;
+  id: number;
+  profile_image_url: string | null;
+};
