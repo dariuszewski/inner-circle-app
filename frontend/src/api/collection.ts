@@ -38,4 +38,5 @@ async function createCollection({ name, description, accessToken }: CreateCollec
   return await response.json()
 }
 
+
 export { createCollection }

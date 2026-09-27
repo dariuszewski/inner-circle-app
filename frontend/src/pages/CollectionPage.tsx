@@ -11,7 +11,9 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { useNavigate } from 'react-router'
 
+import { uploadMedia } from '../api/media'
 import CustomIconButton from '../components/CustomIconButton'
+import SlidingSnackbar from '../components/SlidingSnackbar'
 import { useAuth } from '../providers/useAuth'
 import type { CollectionDetailedRetrieve } from '../types/collectionResponse'
 
@@ -21,7 +23,13 @@ function CollectionPage() {
     const navigate = useNavigate()
     const [collection, setCollection] = useState<CollectionDetailedRetrieve | null>(null)
     const [loading, setLoading] = useState(true)
+    const [uploading, setUploading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [version, setVersion] = useState(0)
+    const [snackbar, setSnackbar] = useState<{
+        message: string
+        severity: 'success' | 'danger'
+    } | null>(null)
 
     useEffect(() => {
         if (!collectionId || !auth.accessToken) {
@@ -54,6 +62,7 @@ function CollectionPage() {
                 console.log(data)
 
                 setCollection(data)
+
             } catch (error) {
                 if (error instanceof DOMException && error.name === 'AbortError') {
                     return
@@ -74,7 +83,7 @@ function CollectionPage() {
         return () => {
             controller.abort()
         }
-    }, [collectionId, auth.accessToken])
+    }, [collectionId, auth.accessToken, version])
 
     if (loading) {
         return (
@@ -90,6 +99,45 @@ function CollectionPage() {
                 Failed to load collection: {error}
             </Typography>
         )
+    }
+
+    const handleMediaSelect = async (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const files = Array.from(event.target.files ?? [])
+
+        if (!files.length || !collectionId || !auth.accessToken) {
+            return
+        }
+
+        try {
+            setUploading(true)
+            setSnackbar(null)
+
+            const uploaded = await uploadMedia({
+                collectionId,
+                files,
+                accessToken: auth.accessToken,
+            })
+
+            setSnackbar({
+                message: `${uploaded.length} file${uploaded.length === 1 ? '' : 's'} uploaded successfully`,
+                severity: 'success',
+            })
+            setVersion(version+1)
+        } catch (error) {
+            setSnackbar({
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : 'Failed to upload media',
+                severity: 'danger',
+            })
+        } finally {
+            setUploading(false)
+            event.target.value = ''
+        }
+
     }
 
     return (
@@ -135,10 +183,20 @@ function CollectionPage() {
                     </CustomIconButton>
 
                     <CustomIconButton
-                        onClick={() => console.log('Add media')}
+                        component="label"
                         ariaLabel="add media"
+                        isLoading={uploading}
                     >
                         <AddPhotoAlternateIcon />
+
+                        {!uploading && (
+                            <input
+                                type="file"
+                                multiple
+                                hidden
+                                onChange={handleMediaSelect}
+                            />
+                        )}
                     </CustomIconButton>
 
                     <CustomIconButton
@@ -150,6 +208,12 @@ function CollectionPage() {
 
                 </Box>
             </Box>
+            <SlidingSnackbar
+                open={snackbar !== null}
+                message={snackbar?.message}
+                severity={snackbar?.severity ?? 'info'}
+                onClose={() => setSnackbar(null)}
+            />
             <Paper
                 elevation={2}
                 sx={{
@@ -161,6 +225,7 @@ function CollectionPage() {
                     textAlign: 'left',
                 }}
             >
+
                 <Box
                     component="pre"
                     sx={{
