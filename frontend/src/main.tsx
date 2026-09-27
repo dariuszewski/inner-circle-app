@@ -130,6 +130,14 @@ const theme = createTheme({
         },
       },
     },
+    MuiDialog: {
+      styleOverrides: {
+        paper: ({ theme }) => ({
+          background: theme.palette.background.paper,
+          opacity: 1,
+        }),
+      },
+    },
     MuiAlert: {
       styleOverrides: {
         message: {

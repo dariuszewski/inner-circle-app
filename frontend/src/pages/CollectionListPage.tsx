@@ -8,18 +8,26 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
-  Paper,
+  Pagination,
   TextField,
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
 
+import { createCollection } from '../api/collection'
+import CollectionListItemCard from '../components/CollectionListItemCard'
+import SlidingSnackbar from '../components/SlidingSnackbar'
 import { useCollections } from '../hooks/useCollections'
+import { useAuth } from '../providers/useAuth'
+
 
 export default function CollectionListPage() {
-  const { data, isLoading, error } = useCollections()
-
+  const auth = useAuth()
+  const [page, setPage] = useState(1)
+  const { data, isLoading, error, refetch } = useCollections(page)
+  const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'danger' } | null>(null)
   const [collectionTitle, setCollectionTitle] = useState('')
   const [collectionDescription, setCollectionDescription] = useState('')
 
@@ -33,15 +41,28 @@ export default function CollectionListPage() {
     setCollectionDescription('')
   }
 
-  const handleSubmit = () => {
-    console.log('Creating collection:', collectionTitle)
-    console.log('Creating collection description:', collectionDescription)
-    // TODO: call your API / mutation here
-
-    handleClose()
+  const handleSubmit = async () => {
+    try {
+      setSnackbar(null)
+      setLoading(true)
+      await createCollection({
+        name: collectionTitle,
+        description: collectionDescription,
+        accessToken: auth.accessToken,
+      })
+      await refetch()
+    } catch (error) {
+      setSnackbar({
+        message: error instanceof Error ? error.message : 'An unknown error occurred',
+        severity: 'danger',
+      })
+    } finally {
+      setLoading(false)
+      handleClose()
+    }
   }
 
-  if (isLoading) {
+  if (isLoading || loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
         <CircularProgress />
@@ -68,7 +89,7 @@ export default function CollectionListPage() {
         }}
       >
         <Typography variant="h5" component="h1">
-          My Collections
+          My Collections ({data?.total_items ?? 0})
         </Typography>
 
         <IconButton
@@ -89,22 +110,56 @@ export default function CollectionListPage() {
         </IconButton>
       </Box>
 
-      <Paper
-        elevation={2}
-        sx={{
-          p: 2,
-          borderRadius: 2,
-          backgroundColor: '#FFFFFF',
-          backgroundImage: 'none',
-          overflow: 'auto',
-        }}
-      >
-        <pre style={{ margin: 0 }}>
-          {JSON.stringify(data, null, 2)}
-        </pre>
-      </Paper>
+      {data?.total_items === 0 ? (
+        <Box
+          sx={{
+            mt: 3,
+            mb: 3,
+            p: 4,
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 2,
+            textAlign: 'center',
+            bgcolor: 'background.paper',
+          }}
+        >
+          <Typography variant="h6" sx={{ mb: 1, color: 'primary.main' }}>
+            No collections yet
+          </Typography>
 
-      <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" >
+          <Typography variant="body2">
+            Press the “+” button to create your first collection.
+          </Typography>
+        </Box>
+      ) : (
+        <>
+          {data?.items?.map((collection) => (
+            <CollectionListItemCard
+              key={collection.id}
+              title={collection.name}
+              body={collection.description}
+              imageSrc={collection.cover_image?.media_url}
+            />
+          ))}
+        </>
+      )}
+      {data?.total_pages && data.total_pages > 1 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+          <Pagination
+            count={data.total_pages}
+            page={page}
+            onChange={(_, value) => setPage(value)}
+            color="primary"
+          />
+        </Box>
+      )}
+
+
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        fullWidth
+      >
         <DialogTitle>Create Collection</DialogTitle>
 
         <DialogContent>
@@ -139,6 +194,14 @@ export default function CollectionListPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <SlidingSnackbar
+        open={snackbar !== null}
+        message={snackbar?.message}
+        severity={snackbar?.severity ?? 'info'}
+        onClose={() => setSnackbar(null)}
+      />
     </Box>
+
   )
 }
