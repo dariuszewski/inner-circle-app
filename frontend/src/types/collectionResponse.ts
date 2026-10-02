@@ -31,5 +31,5 @@ export type CollectionDetailedRetrieve = CollectionRetrieve & {
   created_by: UserResponsePublic;
   members_count: number;
   members: UserResponsePublic[];
-  media: PaginatedResponse<MediaRetrieve>
+  media: MediaRetrieve[]
 };

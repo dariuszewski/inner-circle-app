@@ -33,3 +33,23 @@ export async function uploadMedia({
   }
   return response.json()
 }
+
+export async function deleteMedia({
+  mediaId,
+  accessToken,
+}: {
+  mediaId: number
+  accessToken: string
+}) {
+  const response = await fetch(`/api/media/${mediaId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail ?? `HTTP error! Status: ${response.status}`)
+  }
+}

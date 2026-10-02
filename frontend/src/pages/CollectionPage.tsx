@@ -3,15 +3,22 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import ChangeCircle from '@mui/icons-material/ChangeCircle'
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogContentText from '@mui/material/DialogContentText'
+import DialogTitle from '@mui/material/DialogTitle'
 import IconButton from '@mui/material/IconButton'
-import Paper from '@mui/material/Paper'
+import Pagination from '@mui/material/Pagination'
 import Typography from '@mui/material/Typography'
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router'
 import { useNavigate } from 'react-router'
+import { useParams } from 'react-router'
 
-import { uploadMedia } from '../api/media'
+import { deleteMedia, uploadMedia } from '../api/media'
+import CollectionItem from '../components/CollectionItem'
 import CustomIconButton from '../components/CustomIconButton'
 import SlidingSnackbar from '../components/SlidingSnackbar'
 import { useAuth } from '../providers/useAuth'
@@ -24,6 +31,9 @@ function CollectionPage() {
     const [collection, setCollection] = useState<CollectionDetailedRetrieve | null>(null)
     const [loading, setLoading] = useState(true)
     const [uploading, setUploading] = useState(false)
+    const [mediaPage, setMediaPage] = useState(1)
+    const [mediaToDelete, setMediaToDelete] = useState<{ id: number } | null>(null)
+    const [deletingMedia, setDeletingMedia] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [version, setVersion] = useState(0)
     const [snackbar, setSnackbar] = useState<{
@@ -124,7 +134,7 @@ function CollectionPage() {
                 message: `${uploaded.length} file${uploaded.length === 1 ? '' : 's'} uploaded successfully`,
                 severity: 'success',
             })
-            setVersion(version+1)
+            setVersion(version + 1)
         } catch (error) {
             setSnackbar({
                 message:
@@ -139,6 +149,44 @@ function CollectionPage() {
         }
 
     }
+
+    const handleMediaDelete = async () => {
+        if (!mediaToDelete || !auth.accessToken) {
+            return
+        }
+
+        try {
+            setDeletingMedia(true)
+            await deleteMedia({
+                mediaId: mediaToDelete.id,
+                accessToken: auth.accessToken,
+            })
+            setMediaToDelete(null)
+            setSnackbar({
+                message: 'Media deleted permanently.',
+                severity: 'success',
+            })
+            if (visibleMedia.length === 1 && mediaPage > 1) {
+                setMediaPage(mediaPage - 1)
+            }
+            setVersion((currentVersion) => currentVersion + 1)
+        } catch (error) {
+            setSnackbar({
+                message: error instanceof Error ? error.message : 'Failed to delete media.',
+                severity: 'danger',
+            })
+        } finally {
+            setDeletingMedia(false)
+        }
+    }
+
+    const media = collection?.media ?? []
+    const mediaPageSize = 16
+    const mediaPageCount = Math.ceil(media.length / mediaPageSize)
+    const visibleMedia = media.slice(
+        (mediaPage - 1) * mediaPageSize,
+        mediaPage * mediaPageSize,
+    )
 
     return (
         <Box>
@@ -208,36 +256,74 @@ function CollectionPage() {
 
                 </Box>
             </Box>
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: {
+                        xs: 'repeat(2, minmax(0, 1fr))',
+                        sm: 'repeat(3, minmax(0, 1fr))',
+                        md: 'repeat(4, minmax(0, 1fr))',
+                    },
+                    gap: 1,
+                    mt: 2,
+                }}
+            >
+                {visibleMedia.map((media) => (
+                    <CollectionItem
+                        key={media.id}
+                        src={media.media_url}
+                        alt={`Collection media ${media.id}`}
+                        mediaType={media.media_type}
+                        fileName={media.file_path}
+                        onDeleteClick={() => setMediaToDelete({ id: media.id })}
+                    />
+                ))}
+            </Box>
+            {mediaPageCount > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                    <Pagination
+                        count={mediaPageCount}
+                        page={mediaPage}
+                        onChange={(_, value) => setMediaPage(value)}
+                        color="primary"
+                    />
+                </Box>
+            )}
+
+            <Dialog
+                open={mediaToDelete !== null}
+                onClose={() => !deletingMedia && setMediaToDelete(null)}
+            >
+                <DialogTitle>Delete this media?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        This action is irreversible. The media will be permanently deleted.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setMediaToDelete(null)}
+                        disabled={deletingMedia}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleMediaDelete}
+                        color="error"
+                        variant="contained"
+                        disabled={deletingMedia}
+                    >
+                        {deletingMedia ? 'Deleting...' : 'Delete permanently'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             <SlidingSnackbar
                 open={snackbar !== null}
                 message={snackbar?.message}
                 severity={snackbar?.severity ?? 'info'}
                 onClose={() => setSnackbar(null)}
             />
-            <Paper
-                elevation={2}
-                sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    backgroundColor: '#fff',
-                    color: '#000',
-                    overflow: 'auto',
-                    textAlign: 'left',
-                }}
-            >
-
-                <Box
-                    component="pre"
-                    sx={{
-                        m: 0,
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        color: 'inherit',
-                    }}
-                >
-                    {JSON.stringify(collection, null, 2)}
-                </Box>
-            </Paper>
         </Box>
     )
 }
