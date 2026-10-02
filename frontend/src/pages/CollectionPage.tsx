@@ -20,6 +20,7 @@ import { useParams } from 'react-router'
 import { deleteMedia, uploadMedia } from '../api/media'
 import CollectionItem from '../components/CollectionItem'
 import CustomIconButton from '../components/CustomIconButton'
+import InviteDialog from '../components/InviteDialog'
 import SlidingSnackbar from '../components/SlidingSnackbar'
 import { useAuth } from '../providers/useAuth'
 import type { CollectionDetailedRetrieve } from '../types/collectionResponse'
@@ -34,6 +35,7 @@ function CollectionPage() {
     const [mediaPage, setMediaPage] = useState(1)
     const [mediaToDelete, setMediaToDelete] = useState<{ id: number } | null>(null)
     const [deletingMedia, setDeletingMedia] = useState(false)
+    const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [version, setVersion] = useState(0)
     const [snackbar, setSnackbar] = useState<{
@@ -248,7 +250,7 @@ function CollectionPage() {
                     </CustomIconButton>
 
                     <CustomIconButton
-                        onClick={() => console.log('Invite members')}
+                        onClick={() => setInviteDialogOpen(true)}
                         ariaLabel="invite members"
                     >
                         <PersonAddAltIcon />
@@ -317,6 +319,14 @@ function CollectionPage() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {inviteDialogOpen && collection && (
+                <InviteDialog
+                    open={inviteDialogOpen}
+                    collectionId={collection.id}
+                    onClose={() => setInviteDialogOpen(false)}
+                />
+            )}
 
             <SlidingSnackbar
                 open={snackbar !== null}

@@ -18,6 +18,7 @@ import CollectionListPage from './pages/CollectionListPage.tsx';
 import CollectionPage from './pages/CollectionPage.tsx';
 import ElevateDemoPage from './pages/ElevateDemoPage.tsx';
 import HomePage from './pages/HomePage.tsx';
+import InvitePage from './pages/InvitePage.tsx';
 import LoginPage from './pages/LoginPage.tsx';
 import NotFoundPage from './pages/NotFoundPage.tsx';
 import RegisterPage from './pages/RegisterPage.tsx';
@@ -33,6 +34,10 @@ const router = createBrowserRouter([
     Component: RootLayout,
     hydrateFallbackElement: <div />,
     children: [
+      {
+        path: '/invite/:token',
+        element: <InvitePage />,
+      },
       {
         Component: GuestLayout,
         hydrateFallbackElement: <div />,
