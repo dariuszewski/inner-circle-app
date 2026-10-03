@@ -242,6 +242,7 @@ function CollectionPage() {
                 onClose={() => setActiveMediaIndex(null)}
                 onNavigate={setActiveMediaIndex}
                 onDelete={(item) => setMediaToDelete({ id: item.id })}
+                isModerator={collection?.current_user_role === 'moderator'}
             />
             {mediaPageCount > 1 && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>

@@ -13,7 +13,7 @@ from fastapi import (
     status,
 )
 from pydantic import WithJsonSchema
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -26,6 +26,7 @@ from models import (
     Reaction,
     User,
     UserCollection,
+    UserCollectionRole,
 )
 from schemas import CommentCreate, MediaRetrieve, MediaRetrieveDetailed, ReactionCreate
 from storage import get_storage
@@ -250,6 +251,10 @@ async def delete_media(
         .where(
             Media.id == media_id,
             UserCollection.user_id == current_user.id,
+            or_(
+                Media.uploaded_by_id == current_user.id,
+                UserCollection.user_role == UserCollectionRole.MODERATOR,
+            ),
         )
     )
 

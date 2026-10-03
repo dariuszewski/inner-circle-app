@@ -144,6 +144,12 @@ async def get_collection(
         for membership in collection.collection_memberships
     ]
 
+    current_user_role = next(
+        membership.user_role
+        for membership in collection.collection_memberships
+        if membership.user_id == current_user.id
+    )
+
     media_stmt = (
         select(Media)
         .where(Media.collection_id == collection_id)
@@ -166,6 +172,7 @@ async def get_collection(
         created_at=collection.created_at,
         created_by_id=collection.created_by_id,
         created_by=created_by,
+        current_user_role=current_user_role,
         cover_image=(
             MediaRetrieve.model_validate(collection.cover_image)
             if collection.cover_image

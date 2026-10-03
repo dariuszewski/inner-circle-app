@@ -305,6 +305,7 @@ type MediaGalleryViewerProps = {
 	onClose: () => void
 	onNavigate: (index: number) => void
 	onDelete: (media: MediaRetrieve) => void
+	isModerator: boolean
 }
 
 const reactionOptions: {
@@ -326,6 +327,7 @@ export default function MediaGalleryViewer({
 	onClose,
 	onNavigate,
 	onDelete,
+	isModerator,
 }: MediaGalleryViewerProps) {
 	const touchStart = useRef<{ x: number; y: number } | null>(null)
 	const auth = useAuth()
@@ -344,6 +346,9 @@ export default function MediaGalleryViewer({
 	const [actionLoading, setActionLoading] = useState(false)
 	const [actionError, setActionError] = useState<string | null>(null)
 	const [reactionMenuAnchor, setReactionMenuAnchor] = useState<HTMLElement | null>(null)
+	const canDelete =
+		selectedMedia !== null &&
+		(isModerator || selectedMedia.uploaded_by?.id === auth.user?.id)
 	const currentDetails =
 		isOpen && details?.id === selectedMedia?.id ? details : null
 	const currentReaction = currentDetails?.reactions.find(
@@ -545,6 +550,7 @@ export default function MediaGalleryViewer({
 							justifyContent: 'space-between',
 						}}
 					>
+						{canDelete ? (
 						<IconButton
 							aria-label="Delete media"
 							disableRipple
@@ -559,6 +565,9 @@ export default function MediaGalleryViewer({
 						>
 							<DeleteIcon />
 						</IconButton>
+						) : (
+						<Box />
+						)}
 						<Typography
 							variant="body2"
 							aria-live="polite"

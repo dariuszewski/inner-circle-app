@@ -49,6 +49,7 @@ export type PaginatedResponse<T> = {
 export type CollectionDetailedRetrieve = CollectionRetrieve & {
   created_by_id: number;
   created_by: UserResponsePublic;
+  current_user_role: 'moderator' | 'contributor';
   members_count: number;
   members: UserResponsePublic[];
   media: MediaRetrieve[]

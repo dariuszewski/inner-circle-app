@@ -13,7 +13,7 @@ from pydantic import (
 )
 
 from config import settings
-from models import MediaType, ReactionType, UserRole
+from models import MediaType, ReactionType, UserCollectionRole, UserRole
 
 T = TypeVar("T")
 
@@ -200,6 +200,7 @@ class PaginatedResponse(BaseModel, Generic[T]):  # noqa
 
 
 class CollectionRetrieveDetailed(CollectionRetrieve):
+    current_user_role: UserCollectionRole
     created_by_id: int | None
     created_by: UserRetrievePublic | None
     members_count: int
