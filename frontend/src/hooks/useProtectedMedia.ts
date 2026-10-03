@@ -4,7 +4,7 @@ import { useAuth } from '../providers/useAuth'
 
 const imageCache = new Map<string, string>()
 
-export function useProtectedImage(url?: string | null) {
+export function useProtectedMedia(url?: string | null) {
   const auth = useAuth()
   const cachedImage = url ? imageCache.get(url) ?? null : null
   const [imageUrl, setImageUrl] = useState<string | null>(cachedImage)

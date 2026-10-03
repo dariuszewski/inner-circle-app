@@ -331,6 +331,7 @@ async def delete_comment(
         )
         .where(
             Comment.id == comment_id,
+            Comment.author_id == current_user.id,
             UserCollection.user_id == current_user.id,
         )
     )

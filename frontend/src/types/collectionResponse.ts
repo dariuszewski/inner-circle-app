@@ -6,8 +6,28 @@ export type MediaRetrieve = {
   media_type: string;
   collection_id: number;
   uploaded_at: string;
-  uploaded_by: unknown | null;
+  uploaded_by: UserResponsePublic | null;
   media_url: string;
+};
+
+export type ReactionType = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'angry';
+
+export type CommentRetrieve = {
+  id: number;
+  content: string;
+  created_at: string;
+  author: UserResponsePublic | null;
+};
+
+export type ReactionRetrieve = {
+  id: number;
+  type: ReactionType;
+  user: UserResponsePublic;
+};
+
+export type MediaRetrieveDetailed = MediaRetrieve & {
+  comments: CommentRetrieve[];
+  reactions: ReactionRetrieve[];
 };
 
 export type CollectionRetrieve = {

@@ -3,6 +3,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
+from models import UserCollection, UserCollectionRole
 from tests.conftest import auth_header, create_test_user, login_user
 
 
@@ -195,9 +196,11 @@ async def test_comment_and_reactions(
     # Assert that comment and reaction is visible when retrieving media
     retrieve_response = await client.get(f"/api/media/{media_id}", headers=headers)
     assert retrieve_response.status_code == 200
-    assert (
-        retrieve_response.json()["comments"][0]["content"] == "This is a test comment."
-    )
+    comment = retrieve_response.json()["comments"][0]
+    assert comment["content"] == "This is a test comment."
+    assert comment["created_at"]
+    assert comment["author"]["username"] == user["username"]
+    assert "profile_image_url" in comment["author"]
     assert retrieve_response.json()["reactions"][0]["type"] == "like"
 
     # Assert that user can delete their comment and reaction
@@ -289,3 +292,32 @@ async def test_comment_and_reaction_access_control(
         headers=headers2,
     )
     assert reaction_response.status_code == 400
+
+    # Add user2 to the collection and verify only the comment author can delete.
+    db_session.add(
+        UserCollection(
+            user_id=user2["id"],
+            collection_id=collection_response.json()["id"],
+            user_role=UserCollectionRole.CONTRIBUTOR,
+        )
+    )
+    await db_session.commit()
+
+    comment_response = await client.post(
+        f"/api/media/comment/{media_id}",
+        json={"content": "Only I should be able to delete this."},
+        headers=headers1,
+    )
+    assert comment_response.status_code == 201
+    details_response = await client.get(f"/api/media/{media_id}", headers=headers1)
+    comment_id = details_response.json()["comments"][0]["id"]
+
+    member_delete_response = await client.delete(
+        f"/api/media/comment/{comment_id}", headers=headers2
+    )
+    assert member_delete_response.status_code == 400
+
+    author_delete_response = await client.delete(
+        f"/api/media/comment/{comment_id}", headers=headers1
+    )
+    assert author_delete_response.status_code == 204

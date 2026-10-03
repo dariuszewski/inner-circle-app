@@ -5,7 +5,7 @@ import Typography from '@mui/material/Typography'
 import { useNavigate } from 'react-router'
 
 import logo from '../assets/logo.svg'
-import { useProtectedImage } from '../hooks/useProtectedImage'
+import { useProtectedMedia } from '../hooks/useProtectedMedia'
 
 
 type CollectionListItemCardProps = {
@@ -22,7 +22,7 @@ function CollectionListItemCard({
   imageSrc,
 }: CollectionListItemCardProps) {
   const navigate = useNavigate()
-  const imageUrl = useProtectedImage(imageSrc)
+  const imageUrl = useProtectedMedia(imageSrc)
 
   return (
     <Card

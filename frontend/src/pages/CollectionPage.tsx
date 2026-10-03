@@ -13,7 +13,7 @@ import DialogTitle from '@mui/material/DialogTitle'
 import IconButton from '@mui/material/IconButton'
 import Pagination from '@mui/material/Pagination'
 import Typography from '@mui/material/Typography'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useParams } from 'react-router'
 
@@ -21,81 +21,31 @@ import { deleteMedia, uploadMedia } from '../api/media'
 import CollectionItem from '../components/CollectionItem'
 import CustomIconButton from '../components/CustomIconButton'
 import InviteDialog from '../components/InviteDialog'
+import MediaGalleryViewer from '../components/MediaGalleryViewer'
 import SlidingSnackbar from '../components/SlidingSnackbar'
+import { useCollection } from '../hooks/useCollection'
 import { useAuth } from '../providers/useAuth'
-import type { CollectionDetailedRetrieve } from '../types/collectionResponse'
 
 function CollectionPage() {
     const { collectionId } = useParams<{ collectionId: string }>()
     const auth = useAuth()
     const navigate = useNavigate()
-    const [collection, setCollection] = useState<CollectionDetailedRetrieve | null>(null)
-    const [loading, setLoading] = useState(true)
+    const {
+        data: collection,
+        isLoading: loading,
+        error,
+        refetch,
+    } = useCollection(collectionId)
     const [uploading, setUploading] = useState(false)
     const [mediaPage, setMediaPage] = useState(1)
+    const [activeMediaIndex, setActiveMediaIndex] = useState<number | null>(null)
     const [mediaToDelete, setMediaToDelete] = useState<{ id: number } | null>(null)
     const [deletingMedia, setDeletingMedia] = useState(false)
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
-    const [error, setError] = useState<string | null>(null)
-    const [version, setVersion] = useState(0)
     const [snackbar, setSnackbar] = useState<{
         message: string
         severity: 'success' | 'danger'
     } | null>(null)
-
-    useEffect(() => {
-        if (!collectionId || !auth.accessToken) {
-            return
-        }
-
-        const controller = new AbortController()
-
-        async function fetchCollection() {
-            try {
-                setLoading(true)
-                setError(null)
-
-                const response = await fetch(
-                    `/api/collections/${collectionId}`,
-                    {
-                        headers: {
-                            Authorization: `Bearer ${auth.accessToken}`,
-                        },
-                        signal: controller.signal,
-                    },
-                )
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`)
-                }
-
-                const data = await response.json()
-
-                console.log(data)
-
-                setCollection(data)
-
-            } catch (error) {
-                if (error instanceof DOMException && error.name === 'AbortError') {
-                    return
-                }
-
-                setError(
-                    error instanceof Error
-                        ? error.message
-                        : 'An unknown error occurred',
-                )
-            } finally {
-                setLoading(false)
-            }
-        }
-
-        fetchCollection()
-
-        return () => {
-            controller.abort()
-        }
-    }, [collectionId, auth.accessToken, version])
 
     if (loading) {
         return (
@@ -136,7 +86,7 @@ function CollectionPage() {
                 message: `${uploaded.length} file${uploaded.length === 1 ? '' : 's'} uploaded successfully`,
                 severity: 'success',
             })
-            setVersion(version + 1)
+            await refetch()
         } catch (error) {
             setSnackbar({
                 message:
@@ -163,6 +113,7 @@ function CollectionPage() {
                 mediaId: mediaToDelete.id,
                 accessToken: auth.accessToken,
             })
+            setActiveMediaIndex(null)
             setMediaToDelete(null)
             setSnackbar({
                 message: 'Media deleted permanently.',
@@ -171,7 +122,7 @@ function CollectionPage() {
             if (visibleMedia.length === 1 && mediaPage > 1) {
                 setMediaPage(mediaPage - 1)
             }
-            setVersion((currentVersion) => currentVersion + 1)
+            await refetch()
         } catch (error) {
             setSnackbar({
                 message: error instanceof Error ? error.message : 'Failed to delete media.',
@@ -262,25 +213,36 @@ function CollectionPage() {
                 sx={{
                     display: 'grid',
                     gridTemplateColumns: {
-                        xs: 'repeat(2, minmax(0, 1fr))',
-                        sm: 'repeat(3, minmax(0, 1fr))',
+                        xs: 'repeat(4, minmax(0, 1fr))',
+                        sm: 'repeat(4, minmax(0, 1fr))',
                         md: 'repeat(4, minmax(0, 1fr))',
                     },
                     gap: 1,
                     mt: 2,
                 }}
             >
-                {visibleMedia.map((media) => (
+                {visibleMedia.map((item) => (
                     <CollectionItem
-                        key={media.id}
-                        src={media.media_url}
-                        alt={`Collection media ${media.id}`}
-                        mediaType={media.media_type}
-                        fileName={media.file_path}
-                        onDeleteClick={() => setMediaToDelete({ id: media.id })}
+                        key={item.id}
+                        src={item.media_url}
+                        alt={`Collection media ${item.id}`}
+                        mediaType={item.media_type}
+                        onClick={() => {
+                            const index = media.findIndex(
+                                (mediaItem) => mediaItem.id === item.id,
+                            )
+                            if (index !== -1) setActiveMediaIndex(index)
+                        }}
                     />
                 ))}
             </Box>
+            <MediaGalleryViewer
+                media={media}
+                activeIndex={activeMediaIndex}
+                onClose={() => setActiveMediaIndex(null)}
+                onNavigate={setActiveMediaIndex}
+                onDelete={(item) => setMediaToDelete({ id: item.id })}
+            />
             {mediaPageCount > 1 && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
                     <Pagination

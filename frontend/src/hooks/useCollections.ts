@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import { getCollections } from '../api/collection'
 import { useAuth } from '../providers/useAuth'
 import type {
   CollectionRetrieve,
@@ -32,21 +33,11 @@ export function useCollections(
   const fetchCollections = useCallback(async () => {
     if (!auth.accessToken) return
 
-    const response = await fetch(
-      `/api/collections?page=${page}&per_page=${pageSize}`,
-      {
-        headers: {
-          Authorization: `Bearer ${auth.accessToken}`,
-        },
-      },
-    )
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`)
-    }
-
-    const data =
-      (await response.json()) as PaginatedResponse<CollectionRetrieve>
+    const data = await getCollections({
+      page,
+      pageSize,
+      accessToken: auth.accessToken,
+    })
 
     setState({
       data,
@@ -83,21 +74,11 @@ export function useCollections(
       try {
         if (!auth.accessToken) return
 
-        const response = await fetch(
-          `/api/collections?page=${page}&per_page=${pageSize}`,
-          {
-            headers: {
-              Authorization: `Bearer ${auth.accessToken}`,
-            },
-          },
-        )
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`)
-        }
-
-        const data =
-          (await response.json()) as PaginatedResponse<CollectionRetrieve>
+        const data = await getCollections({
+          page,
+          pageSize,
+          accessToken: auth.accessToken,
+        })
 
         if (!cancelled) {
           setState({

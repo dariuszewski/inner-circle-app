@@ -1,6 +1,7 @@
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { getCollection } from '../api/collection'
 import { useAuth } from '../providers/useAuth'
 import type { CollectionDetailedRetrieve } from '../types/collectionResponse'
 
@@ -25,104 +26,65 @@ export function useCollection(
     isLoading: true,
     error: null,
   })
+  const activeRequest = useRef<AbortController | null>(null)
 
-  const fetchCollection = useCallback(async () => {
+  const loadCollection = useCallback(async () => {
     if (!auth.accessToken || !collectionId) return
 
-    const response = await fetch(
-      `/api/collections/${collectionId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${auth.accessToken}`,
-        },
-      },
-    )
+    activeRequest.current?.abort()
+    const controller = new AbortController()
+    activeRequest.current = controller
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`)
+    try {
+      const data = await getCollection({
+        collectionId,
+        accessToken: auth.accessToken,
+        signal: controller.signal,
+      })
+
+      if (!controller.signal.aborted) {
+        setState({
+          data,
+          isLoading: false,
+          error: null,
+        })
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setState({
+          data: null,
+          isLoading: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : 'An unknown error occurred',
+        })
+      }
+    } finally {
+      if (activeRequest.current === controller) {
+        activeRequest.current = null
+      }
     }
-
-    const data =
-      (await response.json()) as CollectionDetailedRetrieve
-
-    setState({
-      data,
-      isLoading: false,
-      error: null,
-    })
   }, [auth.accessToken, collectionId])
 
   const refetch = useCallback(async () => {
-    try {
-      setState((previous) => ({
-        ...previous,
-        isLoading: true,
-        error: null,
-      }))
+    setState((previous) => ({
+      ...previous,
+      isLoading: true,
+      error: null,
+    }))
 
-      await fetchCollection()
-    } catch (error) {
-      setState({
-        data: null,
-        isLoading: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : 'An unknown error occurred',
-      })
-    }
-  }, [fetchCollection])
+    await loadCollection()
+  }, [loadCollection])
 
   useEffect(() => {
-    let cancelled = false
-
-    async function loadCollection() {
-      try {
-        if (!auth.accessToken || !collectionId) return
-
-        const response = await fetch(
-          `/api/collections/${collectionId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${auth.accessToken}`,
-            },
-          },
-        )
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`)
-        }
-
-        const data =
-          (await response.json()) as CollectionDetailedRetrieve
-
-        if (!cancelled) {
-          setState({
-            data,
-            isLoading: false,
-            error: null,
-          })
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setState({
-            data: null,
-            isLoading: false,
-            error:
-              error instanceof Error
-                ? error.message
-                : 'An unknown error occurred',
-          })
-        }
-      }
-    }
-
-    loadCollection()
+    const timer = setTimeout(() => void loadCollection(), 0)
 
     return () => {
-      cancelled = true
+      clearTimeout(timer)
+      activeRequest.current?.abort()
     }
-  }, [auth.accessToken, collectionId])
+  }, [loadCollection])
 
   return {
     ...state,
