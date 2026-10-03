@@ -1,8 +1,10 @@
+import BrokenImageIcon from '@mui/icons-material/BrokenImage'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import VideoFileIcon from '@mui/icons-material/VideoFile'
 import Box from '@mui/material/Box'
+import Skeleton from '@mui/material/Skeleton'
 
-import { useProtectedMedia } from '../hooks/useProtectedMedia'
+import { useProtectedMediaState } from '../hooks/useProtectedMedia'
 
 type CollectionItemProps = {
 	src: string
@@ -18,10 +20,37 @@ export default function CollectionItem({
 	onClick,
 }: CollectionItemProps) {
 	const isVideo = mediaType === 'video'
-	const imageUrl = useProtectedMedia(isVideo ? undefined : src)
+	const { url: imageUrl, hasError } = useProtectedMediaState(
+		isVideo ? undefined : src,
+	)
+
+	if (!isVideo && hasError) {
+		return (
+			<Box
+				role="img"
+				aria-label="Failed to load media"
+				sx={{
+					aspectRatio: '3 / 4',
+					borderRadius: 2,
+					display: 'grid',
+					placeItems: 'center',
+					color: 'text.secondary',
+					bgcolor: 'action.hover',
+				}}
+			>
+				<BrokenImageIcon fontSize="large" />
+			</Box>
+		)
+	}
 
 	if (!isVideo && !imageUrl) {
-		return null
+		return (
+			<Skeleton
+				variant="rounded"
+				aria-label="Loading media"
+				sx={{ aspectRatio: '3 / 4', width: '100%', height: 'auto', borderRadius: 2 }}
+			/>
+		)
 	}
 
 	return (

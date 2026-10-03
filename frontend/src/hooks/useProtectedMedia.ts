@@ -4,10 +4,11 @@ import { useAuth } from '../providers/useAuth'
 
 const imageCache = new Map<string, string>()
 
-export function useProtectedMedia(url?: string | null) {
+export function useProtectedMediaState(url?: string | null) {
   const auth = useAuth()
   const cachedImage = url ? imageCache.get(url) ?? null : null
   const [imageUrl, setImageUrl] = useState<string | null>(cachedImage)
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (!url || !auth.accessToken) {
@@ -47,6 +48,7 @@ export function useProtectedMedia(url?: string | null) {
         }
 
         setImageUrl(null)
+        setFailedUrl(imageUrl)
       }
     }
 
@@ -57,5 +59,12 @@ export function useProtectedMedia(url?: string | null) {
     }
   }, [url, auth.accessToken])
 
-  return cachedImage ?? imageUrl
+  return {
+    url: cachedImage ?? imageUrl,
+    hasError: !!url && failedUrl === url,
+  }
+}
+
+export function useProtectedMedia(url?: string | null) {
+  return useProtectedMediaState(url).url
 }
