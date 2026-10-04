@@ -112,3 +112,5 @@ else:
     @app.get("/")
     async def read_root_fallback() -> dict:
         return {"message": "Hello, World!"}
+
+# trigger deployment of the FastAPI application
