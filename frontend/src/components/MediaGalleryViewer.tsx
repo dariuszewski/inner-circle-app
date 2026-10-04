@@ -4,9 +4,11 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
+import ListIcon from '@mui/icons-material/List'
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore'
 import NavigateNextIcon from '@mui/icons-material/NavigateNext'
 import SendIcon from '@mui/icons-material/Send'
+import StarBorderIcon from '@mui/icons-material/StarBorder'
 import VideoFileIcon from '@mui/icons-material/VideoFile'
 import Avatar from '@mui/material/Avatar'
 import Badge from '@mui/material/Badge'
@@ -20,6 +22,7 @@ import DialogContentText from '@mui/material/DialogContentText'
 import DialogTitle from '@mui/material/DialogTitle'
 import Divider from '@mui/material/Divider'
 import IconButton from '@mui/material/IconButton'
+import ListItemIcon from '@mui/material/ListItemIcon'
 import Menu from '@mui/material/Menu'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
@@ -305,6 +308,8 @@ type MediaGalleryViewerProps = {
 	onClose: () => void
 	onNavigate: (index: number) => void
 	onDelete: (media: MediaRetrieve) => void
+	onSetCover: (media: MediaRetrieve) => void
+	coverImageId: number | null
 	isModerator: boolean
 }
 
@@ -327,6 +332,8 @@ export default function MediaGalleryViewer({
 	onClose,
 	onNavigate,
 	onDelete,
+	onSetCover,
+	coverImageId,
 	isModerator,
 }: MediaGalleryViewerProps) {
 	const touchStart = useRef<{ x: number; y: number } | null>(null)
@@ -346,9 +353,13 @@ export default function MediaGalleryViewer({
 	const [actionLoading, setActionLoading] = useState(false)
 	const [actionError, setActionError] = useState<string | null>(null)
 	const [reactionMenuAnchor, setReactionMenuAnchor] = useState<HTMLElement | null>(null)
+	const [actionsMenuAnchor, setActionsMenuAnchor] = useState<HTMLElement | null>(null)
+	const [coverConfirmOpen, setCoverConfirmOpen] = useState(false)
 	const canDelete =
 		selectedMedia !== null &&
 		(isModerator || selectedMedia.uploaded_by?.id === auth.user?.id)
+	const canSetCover =
+		selectedMedia !== null && isModerator && selectedMedia.media_type === 'image'
 	const currentDetails =
 		isOpen && details?.id === selectedMedia?.id ? details : null
 	const currentReaction = currentDetails?.reactions.find(
@@ -550,20 +561,19 @@ export default function MediaGalleryViewer({
 							justifyContent: 'space-between',
 						}}
 					>
-						{canDelete ? (
+						{canDelete || canSetCover ? (
 						<IconButton
-							aria-label="Delete media"
+							aria-label="Media actions"
 							disableRipple
-							onClick={() => onDelete(selectedMedia)}
+							onClick={(event) => setActionsMenuAnchor(event.currentTarget)}
 							sx={{
-								alignSelf: 'center',
-								color: 'error.light',
+								color: 'common.white',
 								backgroundColor: 'transparent',
 								'&:hover': { backgroundColor: 'transparent' },
 								'&:active': { backgroundColor: 'transparent' },
 							}}
 						>
-							<DeleteIcon />
+							<ListIcon />
 						</IconButton>
 						) : (
 						<Box />
@@ -738,6 +748,70 @@ export default function MediaGalleryViewer({
 							</IconButton>
 						</Box>
 					</Box>
+					<Menu
+						anchorEl={actionsMenuAnchor}
+						open={Boolean(actionsMenuAnchor)}
+						onClose={() => setActionsMenuAnchor(null)}
+						slotProps={{
+							paper: {
+								sx: {
+									backgroundColor: 'grey.900',
+									backgroundImage: 'none',
+									color: 'common.white',
+									'& .MuiMenuItem-root:hover': { backgroundColor: 'grey.800' },
+								},
+							},
+						}}
+					>
+						{canSetCover && (
+							<MenuItem
+								disabled={selectedMedia.id === coverImageId}
+								onClick={() => {
+									setActionsMenuAnchor(null)
+									setCoverConfirmOpen(true)
+								}}
+							>
+								<ListItemIcon sx={{ color: 'inherit' }}>
+									<StarBorderIcon fontSize="small" />
+								</ListItemIcon>
+								{selectedMedia.id === coverImageId ? 'Current cover image' : 'Set as cover image'}
+							</MenuItem>
+						)}
+						{canDelete && (
+							<MenuItem
+								onClick={() => {
+									setActionsMenuAnchor(null)
+									onDelete(selectedMedia)
+								}}
+								sx={{ color: 'error.light' }}
+							>
+								<ListItemIcon sx={{ color: 'inherit' }}>
+									<DeleteIcon fontSize="small" />
+								</ListItemIcon>
+								Delete
+							</MenuItem>
+						)}
+					</Menu>
+					<Dialog open={coverConfirmOpen} onClose={() => setCoverConfirmOpen(false)}>
+						<DialogTitle>Set as cover image?</DialogTitle>
+						<DialogContent>
+							<DialogContentText>
+								This picture will replace the current cover image of the collection.
+							</DialogContentText>
+						</DialogContent>
+						<DialogActions>
+							<Button onClick={() => setCoverConfirmOpen(false)}>Cancel</Button>
+							<Button
+								variant="contained"
+								onClick={() => {
+									setCoverConfirmOpen(false)
+									onSetCover(selectedMedia)
+								}}
+							>
+								Set as cover
+							</Button>
+						</DialogActions>
+					</Dialog>
 					<Menu
 						anchorEl={reactionMenuAnchor}
 						open={Boolean(reactionMenuAnchor)}

@@ -1,23 +1,74 @@
 import PasswordIcon from '@mui/icons-material/Password'
-import { Box, TextField, Typography } from '@mui/material'
+import { Box, Link, TextField, Typography } from '@mui/material'
 import type { SubmitEventHandler } from 'react'
 import { useState } from 'react'
+import { Link as RouterLink, useSearchParams } from 'react-router'
 
+import { confirmPasswordReset } from '../api/auth'
 import CustomSubmitButton from '../components/CustomSubmitButton'
 import SlidingSnackbar from '../components/SlidingSnackbar'
 
 
 export default function ResetPasswordPage() {
+  const [searchParams] = useSearchParams()
+  const token = searchParams.get('token')
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [done, setDone] = useState(false)
   const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'danger' } | null>(null)
 
   const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
+    if (!token) return
+
+    if (password !== password2) {
+      setSnackbar({ message: 'Passwords do not match.', severity: 'danger' })
+      return
+    }
+
     setIsLoading(true)
-    setSnackbar({ message: 'Feature not implemented yet', severity: 'danger' })
-    setIsLoading(false)
+    setSnackbar(null)
+    try {
+      await confirmPasswordReset({ token, password, password2 })
+      setDone(true)
+    } catch (error) {
+      setSnackbar({
+        message: error instanceof Error ? error.message : 'An unknown error occurred',
+        severity: 'danger',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (!token) {
+    return (
+      <Typography variant="body1" role="alert">
+        No reset token provided.{' '}
+        <Link component={RouterLink} to="/forgot-password">
+          Request a new link
+        </Link>
+      </Typography>
+    )
+  }
+
+  if (done) {
+    return (
+      <>
+        <Typography variant="h4" component="h1">
+          <PasswordIcon fontSize="medium" /> Password updated
+        </Typography>
+        <Typography variant="body1" sx={{ mt: 2 }}>
+          Your password has been reset. Please log in with the new password.
+        </Typography>
+        <Typography variant="body2" sx={{ mt: 2 }}>
+          <Link component={RouterLink} to="/login">
+            Go to login
+          </Link>
+        </Typography>
+      </>
+    )
   }
 
   return (

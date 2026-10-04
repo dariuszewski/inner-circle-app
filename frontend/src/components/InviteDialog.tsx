@@ -1,5 +1,4 @@
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import QrCode2Icon from '@mui/icons-material/QrCode2'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -10,7 +9,7 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
 import Typography from '@mui/material/Typography'
 import { QRCodeSVG } from 'qrcode.react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { createInvitation } from '../api/invitations'
 import { useAuth } from '../providers/useAuth'
@@ -28,37 +27,48 @@ export default function InviteDialog({
 }: InviteDialogProps) {
 	const auth = useAuth()
 	const [token, setToken] = useState<string | null>(null)
-	const [loading, setLoading] = useState(false)
+	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const [linkCopied, setLinkCopied] = useState(false)
+	const [attempt, setAttempt] = useState(0)
 
 	const inviteUrl = token
 		? `${window.location.origin}/invite/${encodeURIComponent(token)}`
 		: ''
 
-	const handleGenerate = async () => {
-		if (!auth.accessToken) {
-			setError('Please sign in again to create an invitation.')
-			return
-		}
+	// the dialog is mounted per open, so loading starts true and the first fetch runs on mount
+	useEffect(() => {
+		let cancelled = false
+		const request = auth.accessToken
+			? createInvitation(collectionId, auth.accessToken)
+			: Promise.reject(new Error('Please sign in again to create an invitation.'))
 
-		try {
-			setLoading(true)
-			setError(null)
-			const invitationToken = await createInvitation(
-				collectionId,
-				auth.accessToken,
-			)
-			setToken(invitationToken)
-		} catch (cause) {
-			setError(
-				cause instanceof Error
-					? cause.message
-					: 'Unable to create an invitation.',
-			)
-		} finally {
-			setLoading(false)
+		request
+			.then((invitationToken) => {
+				if (!cancelled) setToken(invitationToken)
+			})
+			.catch((cause) => {
+				if (!cancelled) {
+					setError(
+						cause instanceof Error
+							? cause.message
+							: 'Unable to create an invitation.',
+					)
+				}
+			})
+			.finally(() => {
+				if (!cancelled) setLoading(false)
+			})
+
+		return () => {
+			cancelled = true
 		}
+	}, [attempt, auth.accessToken, collectionId])
+
+	const handleRetry = () => {
+		setError(null)
+		setLoading(true)
+		setAttempt((value) => value + 1)
 	}
 
 	const handleCopyLink = async () => {
@@ -90,15 +100,13 @@ export default function InviteDialog({
 							{linkCopied ? 'Link copied' : 'Copy invite link'}
 						</Button>
 					</Box>
+				) : loading ? (
+					<Box sx={{ display: 'grid', justifyItems: 'center', py: 3 }}>
+						<CircularProgress />
+					</Box>
 				) : (
-					<Button
-						fullWidth
-						variant="contained"
-						startIcon={loading ? <CircularProgress size={18} /> : <QrCode2Icon />}
-						disabled={loading}
-						onClick={handleGenerate}
-					>
-						{loading ? 'Generating…' : 'Invite by QR code'}
+					<Button fullWidth variant="contained" onClick={handleRetry}>
+						Try again
 					</Button>
 				)}
 			</DialogContent>

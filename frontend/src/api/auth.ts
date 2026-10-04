@@ -102,3 +102,47 @@ export async function register({ username, password, password2, email }: Registe
 
     return response.json();
 }
+
+async function getErrorMessage(response: Response, fallback: string): Promise<string> {
+    try {
+        const body = await response.json();
+        if (typeof body?.detail === 'string') {
+            return body.detail;
+        }
+    } catch {
+        // body was not JSON, use the fallback
+    }
+    return fallback;
+}
+
+export async function requestPasswordReset(email: string): Promise<RegisterResponse> {
+    const response = await fetch('/api/users/reset-password', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email })
+    });
+
+    if (!response.ok) {
+        throw new Error(await getErrorMessage(response, 'Could not request a password reset'));
+    }
+
+    return response.json();
+}
+
+export async function confirmPasswordReset(
+    { token, password, password2 }: { token: string; password: string; password2: string },
+): Promise<void> {
+    const response = await fetch('/api/users/reset-password/confirm', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ token, password, password2 })
+    });
+
+    if (!response.ok) {
+        throw new Error(await getErrorMessage(response, 'Could not reset the password'));
+    }
+}

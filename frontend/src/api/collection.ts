@@ -90,4 +90,33 @@ async function getCollections({ page, pageSize, accessToken, signal }: GetCollec
   return (await response.json()) as PaginatedResponse<CollectionRetrieve>
 }
 
-export { createCollection, getCollection, getCollections }
+async function updateCollection({
+  collectionId,
+  name,
+  description,
+  coverImageId,
+  accessToken,
+}: {
+  collectionId: number | string
+  name?: string
+  description?: string | null
+  coverImageId?: number
+  accessToken: string
+}): Promise<CollectionRetrieve> {
+  const response = await fetch(`/api/collections/${collectionId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ name, description, cover_image_id: coverImageId }),
+  })
+
+  if (!response.ok) {
+    throw await parseError(response, `HTTP error! Status: ${response.status}`)
+  }
+
+  return (await response.json()) as CollectionRetrieve
+}
+
+export { createCollection, getCollection, getCollections, updateCollection }

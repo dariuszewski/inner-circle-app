@@ -17,6 +17,7 @@ import CheckEmailPage from './pages/CheckEmailPage.tsx';
 import CollectionListPage from './pages/CollectionListPage.tsx';
 import CollectionPage from './pages/CollectionPage.tsx';
 import ElevateDemoPage from './pages/ElevateDemoPage.tsx';
+import ForgotPasswordPage from './pages/ForgotPasswordPage.tsx';
 import HomePage from './pages/HomePage.tsx';
 import InvitePage from './pages/InvitePage.tsx';
 import LoginPage from './pages/LoginPage.tsx';
@@ -37,6 +38,11 @@ const router = createBrowserRouter([
       {
         path: '/invite/:token',
         element: <InvitePage />,
+      },
+      {
+        // reachable both logged in and out, so it sits outside GuestLayout
+        path: '/reset-password',
+        element: <ResetPasswordPage />,
       },
       {
         Component: GuestLayout,
@@ -62,6 +68,10 @@ const router = createBrowserRouter([
           {
             path: '/login',
             element: <LoginPage />,
+          },
+          {
+            path: '/forgot-password',
+            element: <ForgotPasswordPage />,
           },
         ],
       },
@@ -96,7 +106,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/settings/reset-password',
-        element: <ResetPasswordPage />, 
+        element: <ForgotPasswordPage />,
       },
       {
         path: '/settings/elevate-demo',

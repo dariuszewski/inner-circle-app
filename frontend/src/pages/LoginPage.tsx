@@ -33,11 +33,6 @@ export default function LoginPage() {
     }
   }
 
-  const handleResetPassword = () => {
-    // Implement the reset password logic here
-    setSnackbar({ message: 'Feature not implemented yet', severity: 'danger' })
-  }
-  
   return (
     <>
       <AnimatedLogo />
@@ -72,9 +67,9 @@ export default function LoginPage() {
 
       <Typography variant="body2" sx={{ mt: 2 }}>
         Forgot your password?{' '}
-        <Typography component={Link} onClick={handleResetPassword}>
+        <Link component={RouterLink} to="/forgot-password">
           Reset it here
-        </Typography>
+        </Link>
       </Typography>
 
       <SlidingSnackbar

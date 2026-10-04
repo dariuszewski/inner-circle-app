@@ -36,6 +36,7 @@ from models import (
 from schemas import (
     LogoutRequest,
     PaginatedResponse,
+    PasswordResetConfirm,
     RefreshTokenRequest,
     Token,
     UserCreate,
@@ -63,6 +64,10 @@ from utils.logging_config import logger
 from utils.media import get_media_type, get_upload_file_size
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+RESET_REQUEST_DETAIL = (
+    "If an account exists for this email, a reset link was generated."
+)
 
 
 @router.get("")
@@ -439,15 +444,49 @@ async def request_password_reset(
         # send email here and change response
 
         return VerificationRequestResponse(
-            detail="Password reset link generated.",
+            detail=RESET_REQUEST_DETAIL,
             verification_link=verification_link,
         )
 
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No user found with the provided email.",
+    # same detail for unknown emails so the response doesn't reveal which exist
+    return VerificationRequestResponse(detail=RESET_REQUEST_DETAIL)
+
+
+@router.post("/reset-password/confirm")
+async def confirm_password_reset(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    confirm: Annotated[PasswordResetConfirm, Body()],
+) -> dict[str, str]:
+    verification = await db.scalar(
+        select(VerificationToken).where(
+            VerificationToken.token_hash == hash_token(confirm.token),
+            VerificationToken.purpose == VerificationTokenPurpose.PASSWORD_RESET,
+            VerificationToken.expires_at > datetime.now(UTC),
+            ~VerificationToken.is_used,
         )
+    )
+    user = await db.get(User, verification.user_id) if verification else None
+
+    if verification is None or user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset link.",
+        )
+
+    user.hashed_password = get_password_hash(confirm.password)
+    verification.is_used = True
+
+    # sign the user out everywhere
+    active_tokens = await db.scalars(
+        select(RefreshToken).where(
+            RefreshToken.user_id == user.id,
+            RefreshToken.revoked_at.is_(None),
+        )
+    )
+    invalidate_refresh_token_family(active_tokens)
+
+    await db.commit()
+    return {"detail": "Password reset successfully."}
 
 
 @router.post("/account-deletion")
@@ -531,18 +570,6 @@ async def verify_verification_token(
         verification.is_used = True
         await db.commit()
         return {"detail": "Email changed successfully."}
-
-    elif verification.purpose == VerificationTokenPurpose.PASSWORD_RESET:
-        user = await db.get(User, verification.user_id)
-        assert user is not None and verification.future_password_hash is not None
-        user.hashed_password = verification.future_password_hash
-
-        # keep record of the password reset for auditing purposes, but delete the pwhash
-        verification.future_password_hash = None
-        verification.is_used = True
-
-        await db.commit()
-        return {"detail": "Password reset successfully."}
 
     elif verification.purpose == VerificationTokenPurpose.ACCOUNT_DELETION:
         user = await db.get(User, verification.user_id)

@@ -56,6 +56,18 @@ class UserUpdateEmail(BaseModel):
     email: EmailStr
 
 
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(min_length=1, max_length=256)
+    password: str = Field(min_length=8, max_length=128)
+    password2: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def passwords_match(self) -> "PasswordResetConfirm":
+        if self.password != self.password2:
+            raise ValueError("Passwords do not match.")
+        return self
+
+
 class UserRetrievePublic(UserBase):
     model_config = ConfigDict(from_attributes=True)
 

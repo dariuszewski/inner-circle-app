@@ -240,8 +240,22 @@ async def update_collection(
             detail="Collection not found or access denied.",
         )
 
+    if update_collection.cover_image_id is not None:
+        cover_exists = await db.scalar(
+            select(Media.id).where(
+                Media.id == update_collection.cover_image_id,
+                Media.collection_id == collection_id,
+            )
+        )
+        if cover_exists is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cover image must belong to this collection.",
+            )
+
     collection.name = update_collection.name or collection.name
-    collection.description = update_collection.description or collection.description
+    if "description" in update_collection.model_fields_set:
+        collection.description = update_collection.description
     collection.cover_image_id = (
         update_collection.cover_image_id or collection.cover_image_id
     )

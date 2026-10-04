@@ -1,6 +1,6 @@
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
-import ChangeCircle from '@mui/icons-material/ChangeCircle'
+import EditIcon from '@mui/icons-material/Edit'
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -17,11 +17,14 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useParams } from 'react-router'
 
+import { updateCollection } from '../api/collection'
 import { deleteMedia, uploadMedia } from '../api/media'
 import CollectionItem from '../components/CollectionItem'
 import CustomIconButton from '../components/CustomIconButton'
+import EditCollectionDialog from '../components/EditCollectionDialog'
 import InviteDialog from '../components/InviteDialog'
 import MediaGalleryViewer from '../components/MediaGalleryViewer'
+import MembersSummary from '../components/MembersSummary'
 import SlidingSnackbar from '../components/SlidingSnackbar'
 import { useCollection } from '../hooks/useCollection'
 import { useAuth } from '../providers/useAuth'
@@ -42,6 +45,7 @@ function CollectionPage() {
     const [mediaToDelete, setMediaToDelete] = useState<{ id: number } | null>(null)
     const [deletingMedia, setDeletingMedia] = useState(false)
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
+    const [editDialogOpen, setEditDialogOpen] = useState(false)
     const [snackbar, setSnackbar] = useState<{
         message: string
         severity: 'success' | 'danger'
@@ -133,7 +137,29 @@ function CollectionPage() {
         }
     }
 
+    const handleSetCover = async (item: { id: number }) => {
+        if (!collectionId || !auth.accessToken) {
+            return
+        }
+
+        try {
+            await updateCollection({
+                collectionId,
+                coverImageId: item.id,
+                accessToken: auth.accessToken,
+            })
+            setSnackbar({ message: 'Cover image updated.', severity: 'success' })
+            await refetch()
+        } catch (error) {
+            setSnackbar({
+                message: error instanceof Error ? error.message : 'Failed to set cover image.',
+                severity: 'danger',
+            })
+        }
+    }
+
     const media = collection?.media ?? []
+    const isModerator = collection?.current_user_role === 'moderator'
     const mediaPageSize = 16
     const mediaPageCount = Math.ceil(media.length / mediaPageSize)
     const visibleMedia = media.slice(
@@ -148,7 +174,7 @@ function CollectionPage() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    mb: 2,
+                    mb: 0.5,
                 }}
             >
                 <Box
@@ -176,12 +202,14 @@ function CollectionPage() {
                         gap: 1,
                     }}
                 >
-                    <CustomIconButton
-                        onClick={() => console.log('Update')}
-                        ariaLabel="update"
-                    >
-                        <ChangeCircle />
-                    </CustomIconButton>
+                    {isModerator && (
+                        <CustomIconButton
+                            onClick={() => setEditDialogOpen(true)}
+                            ariaLabel="update"
+                        >
+                            <EditIcon />
+                        </CustomIconButton>
+                    )}
 
                     <CustomIconButton
                         component="label"
@@ -209,6 +237,15 @@ function CollectionPage() {
 
                 </Box>
             </Box>
+
+            {collection && (
+                <MembersSummary
+                    count={collection.members_count}
+                    members={collection.members}
+                    ownerId={collection.created_by_id}
+                    itemsCount={collection.media.length}
+                />
+            )}
             <Box
                 sx={{
                     display: 'grid',
@@ -242,7 +279,9 @@ function CollectionPage() {
                 onClose={() => setActiveMediaIndex(null)}
                 onNavigate={setActiveMediaIndex}
                 onDelete={(item) => setMediaToDelete({ id: item.id })}
-                isModerator={collection?.current_user_role === 'moderator'}
+                onSetCover={handleSetCover}
+                coverImageId={collection?.cover_image?.id ?? null}
+                isModerator={isModerator}
             />
             {mediaPageCount > 1 && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
@@ -282,6 +321,17 @@ function CollectionPage() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {editDialogOpen && collection && (
+                <EditCollectionDialog
+                    open={editDialogOpen}
+                    collectionId={collection.id}
+                    initialName={collection.name}
+                    initialDescription={collection.description}
+                    onClose={() => setEditDialogOpen(false)}
+                    onSaved={refetch}
+                />
+            )}
 
             {inviteDialogOpen && collection && (
                 <InviteDialog

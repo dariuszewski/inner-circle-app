@@ -550,15 +550,15 @@ async def test_change_email_happy_path(client: AsyncClient) -> None:
 
 
 @pytest.mark.anyio
-async def test_request_password_reset_user_not_found_returns_404(
+async def test_request_password_reset_unknown_email_returns_generic_response(
     client: AsyncClient,
 ) -> None:
     response = await client.post(
         "/api/users/reset-password", json={"email": "nobody@example.com"}
     )
 
-    assert response.status_code == 404
-    assert response.json()["detail"] == "No user found with the provided email."
+    assert response.status_code == 200
+    assert response.json()["verification_link"] is None
 
 
 @pytest.mark.anyio
@@ -576,7 +576,9 @@ async def test_request_password_reset_happy_path(
 
     assert response.status_code == 200
     body = response.json()
-    assert body["detail"] == "Password reset link generated."
+    assert body["detail"] == (
+        "If an account exists for this email, a reset link was generated."
+    )
     assert body["verification_link"].startswith(
         f"{settings.base_url}/api/users/reset-password/"
     )
@@ -677,36 +679,31 @@ async def test_verify_email_change_token_cannot_be_reused(
 
 
 @pytest.mark.anyio
-async def test_verify_password_reset_happy_path(
+async def test_confirm_password_reset_happy_path(
     client: AsyncClient,
-    db_session: AsyncSession,
 ) -> None:
     await create_test_user(
         client, "reset_verify_user", "reset_verify_user@example.com", "StrongPass123!"
     )
+    old_tokens = await login_user(client, "reset_verify_user", "StrongPass123!")
 
     reset_response = await client.post(
         "/api/users/reset-password", json={"email": "reset_verify_user@example.com"}
     )
     assert reset_response.status_code == 200
-
-    # the reset-password endpoint doesn't collect a new password yet, so the
-    # pending token's future_password_hash is set directly for this test
-    new_password_hash = get_password_hash("NewStrongPass456!")
-    token = await db_session.scalar(
-        select(VerificationToken).where(
-            VerificationToken.purpose == VerificationTokenPurpose.PASSWORD_RESET
-        )
-    )
-    assert token is not None
-    token.future_password_hash = new_password_hash
-    await db_session.commit()
-
     raw_token = reset_response.json()["verification_link"].rsplit("/", 1)[-1]
-    verify_response = await client.get(f"/api/users/verify/{raw_token}")
 
-    assert verify_response.status_code == 200
-    assert verify_response.json()["detail"] == "Password reset successfully."
+    confirm_response = await client.post(
+        "/api/users/reset-password/confirm",
+        json={
+            "token": raw_token,
+            "password": "NewStrongPass456!",
+            "password2": "NewStrongPass456!",
+        },
+    )
+
+    assert confirm_response.status_code == 200
+    assert confirm_response.json()["detail"] == "Password reset successfully."
 
     old_login = await client.post(
         "/api/users/token",
@@ -714,15 +711,60 @@ async def test_verify_password_reset_happy_path(
     )
     assert old_login.status_code == 401
 
+    refresh_response = await client.post(
+        "/api/users/refresh",
+        json={"refresh_token": old_tokens["refresh_token"]},
+    )
+    assert refresh_response.status_code == 401
+
     new_login = await client.post(
         "/api/users/token",
         data={"username": "reset_verify_user", "password": "NewStrongPass456!"},
     )
     assert new_login.status_code == 200
 
-    await db_session.refresh(token)
-    assert token.is_used is True
-    assert token.future_password_hash is None
+    reused = await client.post(
+        "/api/users/reset-password/confirm",
+        json={
+            "token": raw_token,
+            "password": "AnotherPass789!",
+            "password2": "AnotherPass789!",
+        },
+    )
+    assert reused.status_code == 400
+
+
+@pytest.mark.anyio
+async def test_confirm_password_reset_invalid_token_returns_400(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        "/api/users/reset-password/confirm",
+        json={
+            "token": "not-a-real-token",
+            "password": "NewStrongPass456!",
+            "password2": "NewStrongPass456!",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid or expired reset link."
+
+
+@pytest.mark.anyio
+async def test_confirm_password_reset_mismatched_passwords_returns_422(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        "/api/users/reset-password/confirm",
+        json={
+            "token": "whatever",
+            "password": "NewStrongPass456!",
+            "password2": "DifferentPass789!",
+        },
+    )
+
+    assert response.status_code == 422
 
 
 @pytest.mark.anyio
