@@ -87,7 +87,7 @@ async def read_root(
 
 
 frontend_dist = pathlib.Path(__file__).parent / "frontend" / "dist"
-
+logger.info("frontend_dist=%s exists=%s", frontend_dist, frontend_dist.exists())
 if frontend_dist.exists():
 
     @app.get("/{full_path:path}")
