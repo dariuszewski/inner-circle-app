@@ -53,7 +53,8 @@ def send_templated_email(
     template_name: str,
     context: Mapping[str, object],
 ) -> None:
-    logo_cid = make_msgid()[1:-1]
+    sender_domain = settings.smtp_from_email.rsplit("@", maxsplit=1)[-1]
+    logo_cid = make_msgid(domain=sender_domain)[1:-1]
     template_context = {**context, "logo_cid": logo_cid}
     subject, text_body, html_body = render_email_parts(
         template_name,
