@@ -1,8 +1,9 @@
 import os
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Callable, Generator
 from pathlib import Path
 from typing import Any, cast
 from unittest.mock import AsyncMock
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from httpx import AsyncClient
@@ -22,6 +23,28 @@ from storage import get_storage
 from utils.auth import get_password_hash
 
 pytest_plugins = ["anyio"]
+
+sent_token_emails: list[tuple[str, str, str]] = []
+
+
+def get_sent_token(recipient: str, purpose: str) -> str:
+    for email_purpose, email_recipient, email_link in reversed(sent_token_emails):
+        if email_purpose == purpose and email_recipient == recipient:
+            parsed_link = urlparse(email_link)
+            token = parse_qs(parsed_link.fragment or parsed_link.query).get(
+                "token", [None]
+            )[0]
+            if token is not None:
+                return token
+    raise AssertionError(f"No {purpose} email recorded for {recipient}.")
+
+
+def get_token_from_email_link(email_link: str) -> str:
+    parsed_link = urlparse(email_link)
+    token = parse_qs(parsed_link.fragment or parsed_link.query).get("token", [None])[0]
+    if token is None:
+        raise AssertionError("Email link does not contain a token query parameter.")
+    return token
 
 
 os.environ["SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes-long"
@@ -112,6 +135,52 @@ def mock_s3_client() -> AsyncMock:
     return mock_client
 
 
+@pytest.fixture(autouse=True)
+def capture_emails(monkeypatch: pytest.MonkeyPatch) -> None:
+    from routes import users as user_routes
+
+    sent_token_emails.clear()
+
+    def capture_token_email(purpose: str) -> Callable[..., None]:
+        def capture(*args: object) -> None:
+            recipient, email_link = args[0], args[2]
+            assert isinstance(recipient, str)
+            assert isinstance(email_link, str)
+            sent_token_emails.append((purpose, recipient, email_link))
+
+        return capture
+
+    def ignore_email(*_args: object) -> None:
+        return None
+
+    monkeypatch.setattr(
+        user_routes,
+        "send_registration_verification_email",
+        capture_token_email("verify"),
+    )
+    monkeypatch.setattr(
+        user_routes, "send_demo_elevation_email", capture_token_email("verify")
+    )
+    monkeypatch.setattr(user_routes, "send_email_change_notice", ignore_email)
+    monkeypatch.setattr(
+        user_routes,
+        "send_email_change_verification_email",
+        capture_token_email("verify"),
+    )
+    monkeypatch.setattr(user_routes, "send_password_changed_email", ignore_email)
+    monkeypatch.setattr(
+        user_routes,
+        "send_password_reset_email",
+        capture_token_email("reset"),
+    )
+    monkeypatch.setattr(
+        user_routes,
+        "send_account_deletion_email",
+        capture_token_email("verify"),
+    )
+    monkeypatch.setattr(user_routes, "send_welcome_email", ignore_email)
+
+
 @pytest.fixture(scope="function")
 async def client(
     db_session: AsyncSession, mock_s3_client: AsyncMock
@@ -164,12 +233,16 @@ async def create_test_user(
     )
     assert response.status_code == 201
 
-    verify_response = await client.get(response.json()["verification_link"])
+    verification_token = get_sent_token(email, "verify")
+    verify_response = await client.post(
+        "/api/users/verify",
+        json={"token": verification_token},
+    )
     assert verify_response.status_code == 200
 
-    token = await login_user(client, username, password)
+    login_response = await login_user(client, username, password)
     me_response = await client.get(
-        "/api/users/me", headers=auth_header(token["access_token"])
+        "/api/users/me", headers=auth_header(login_response["access_token"])
     )
     assert me_response.status_code == 200
     return cast(dict[str, Any], me_response.json())

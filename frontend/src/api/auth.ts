@@ -20,7 +20,6 @@ type RegisterInput = {
 
 type RegisterResponse = {
     detail: string;
-    verification_link: string | null;
 };
 
 export async function getCurrentUser(accessToken: string): Promise<UserResponsePrivate> {

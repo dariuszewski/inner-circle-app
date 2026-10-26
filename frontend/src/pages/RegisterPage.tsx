@@ -33,7 +33,8 @@ export default function RegisterPage() {
           state:
           {
             detail: response.detail,
-            verificationLink: response.verification_link
+            email: email || null,
+            verificationRequired: Boolean(email),
           }
         }
       )

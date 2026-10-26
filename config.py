@@ -51,6 +51,15 @@ class Settings(BaseSettings):
     max_upload_size_bytes: int = 10485760
     max_data_storage_per_user_bytes: int = 1073741824
 
+    # SMTP settings
+    smtp_host: str = "localhost"
+    smtp_port: int = 1025
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_secure: bool = False
+    smtp_from_email: str = "noreply@inner-circle.local"
+    smtp_from_name: str = "Inner Circle"
+
     # Logs settings
     log_file: str | None = "requests.log"
     log_max_bytes: int = 1024 * 1024

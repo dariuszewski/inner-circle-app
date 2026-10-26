@@ -94,7 +94,10 @@ class UserRetrievePrivate(UserRetrievePublic):
 
 class VerificationRequestResponse(BaseModel):
     detail: str
-    verification_link: str | None = None
+
+
+class VerificationTokenRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=256)
 
 
 class ReactionBase(BaseModel):

@@ -1,22 +1,30 @@
 import PasswordIcon from '@mui/icons-material/Password'
 import { Box, Link, TextField, Typography } from '@mui/material'
 import type { SubmitEventHandler } from 'react'
-import { useState } from 'react'
-import { Link as RouterLink, useSearchParams } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router'
 
 import { confirmPasswordReset } from '../api/auth'
+import AnimatedLogo from '../components/AnimatedLogo'
 import CustomSubmitButton from '../components/CustomSubmitButton'
 import SlidingSnackbar from '../components/SlidingSnackbar'
 
 
 export default function ResetPasswordPage() {
-  const [searchParams] = useSearchParams()
-  const token = searchParams.get('token')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [token] = useState(() => new URLSearchParams(location.hash.slice(1)).get('token'))
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [done, setDone] = useState(false)
   const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'danger' } | null>(null)
+
+  useEffect(() => {
+    if (location.hash) {
+      navigate(location.pathname, { replace: true })
+    }
+  }, [location.hash, location.pathname, navigate])
 
   const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
@@ -55,7 +63,19 @@ export default function ResetPasswordPage() {
 
   if (done) {
     return (
-      <>
+      <Box
+        sx={{
+          minHeight: {
+            xs: 'calc(100dvh - 24px)',
+            sm: 'calc(100dvh - 40px)',
+          },
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <AnimatedLogo />
         <Typography variant="h4" component="h1">
           <PasswordIcon fontSize="medium" /> Password updated
         </Typography>
@@ -67,7 +87,7 @@ export default function ResetPasswordPage() {
             Go to login
           </Link>
         </Typography>
-      </>
+      </Box>
     )
   }
 

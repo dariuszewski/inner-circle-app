@@ -21,6 +21,13 @@ services:
       - seaweedfs_data:/data
       - ./s3-dev-config.yml:/etc/seaweedfs/s3.json:ro
 
+  smtp:
+    image: axllent/mailpit:latest
+    container_name: inner_circle_smtp
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   backend:
     build:
       context: .
@@ -33,12 +40,16 @@ services:
         condition: service_started
       storage:
         condition: service_started
+      smtp:
+        condition: service_started
     environment:
       - DATABASE_URL=postgresql+asyncpg://ic_user:ic_password@db:5432/ic_db
       - STORAGE_URL=http://storage:8333
       - STORAGE_BUCKET=inner-circle
       - STORAGE_ACCESS_KEY=inner_circle
       - STORAGE_SECRET_KEY=inner_circle
+      - SMTP_HOST=smtp
+      - SMTP_PORT=1025
     volumes:
       - .:/app
       # Mask the host virtualenv directory (Windows .venv) so container operations

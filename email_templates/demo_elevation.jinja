@@ -1,0 +1,25 @@
+{% extends "base_email.jinja" %}
+
+{% macro subject() %}Complete your Inner Circle account{% endmacro %}
+
+{% macro text_body() %}
+{% autoescape false %}
+Hello {{ username }},
+
+Verify this email address to upgrade your demo account to a regular account:
+{{ verification_link }}
+
+This link expires in {{ expiry_hours }} hours. If you didn't request this change, you can ignore this email.
+{% endautoescape %}
+{% endmacro %}
+
+{% block email_title %}Upgrade your Inner Circle account{% endblock %}
+
+{% block content %}
+	<h1 style="margin: 0 0 20px; font-size: 24px;">Make your account permanent, {{ username }}</h1>
+	<p style="margin: 0 0 20px;">Verify this email address to upgrade your demo account to a regular Inner Circle account.</p>
+	<p style="margin: 0 0 24px;">
+		<a href="{{ verification_link }}" style="display: inline-block; padding: 12px 18px; border-radius: 4px; background: #287354; color: #ffffff; font-weight: bold; text-decoration: none;">Upgrade account</a>
+	</p>
+	<p style="margin: 0 0 16px; color: #58645e; font-size: 13px;">This link expires in {{ expiry_hours }} hours. If you didn’t request this change, you can ignore this email.</p>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base_email.jinja" %}
+
+{% macro subject() %}A change to your Inner Circle email was requested{% endmacro %}
+
+{% macro text_body() %}
+{% autoescape false %}
+Hello {{ username }},
+
+A request was made to change the email on your Inner Circle account to {{ new_email }}.
+If you did not make this request, secure your account and contact support.
+{% endautoescape %}
+{% endmacro %}
+
+{% block email_title %}Email change requested | Inner Circle{% endblock %}
+
+{% block content %}
+	<h1 style="margin: 0 0 20px; font-size: 24px;">Email change requested</h1>
+	<p style="margin: 0 0 16px;">Hello {{ username }}, a request was made to change your Inner Circle account email to:</p>
+	<p style="margin: 0 0 20px; font-weight: bold;">{{ new_email }}</p>
+	<p style="margin: 0;">If you didn't make this request, secure your account and contact support.</p>
+{% endblock %}

@@ -1,9 +1,7 @@
 import AlternateEmailIcon from '@mui/icons-material/AlternateEmail'
-import { Box, TextField,Typography } from '@mui/material'
-import { Link } from '@mui/material'
+import { Box, TextField, Typography } from '@mui/material'
 import type { SubmitEventHandler } from 'react'
 import { useState } from 'react'
-import { Link as RouterLink } from 'react-router'
 
 import type { VerificationRequestResponse } from '../api/user'
 import CustomSubmitButton from '../components/CustomSubmitButton'
@@ -16,13 +14,13 @@ export default function ChangeEmailPage() {
   const [email, setEmail] = useState(auth.user?.email || '')
   const [isLoading, setIsLoading] = useState(false)
   const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'danger' } | null>(null)
-  const [verifyUrl, setVerifyUrl] = useState<string | null>(null)
+  const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null)
 
   const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
     setIsLoading(true)
     setSnackbar(null)
-    setVerifyUrl(null)
+    setConfirmationMessage(null)
     try {
       if (!auth.accessToken) {
         throw new Error('You are not authenticated.')
@@ -53,9 +51,7 @@ export default function ChangeEmailPage() {
         throw new Error(message)
       }
       const data = await res.json() as VerificationRequestResponse
-      // the backend link points at the API; route it through the protected frontend verify page instead
-      const token = data.verification_link?.split('/verify/').pop()
-      setVerifyUrl(token ? `/settings/verify?token=${encodeURIComponent(token)}` : null)
+      setConfirmationMessage(data.detail)
     } catch (err) {
       setSnackbar({
         message: err instanceof Error ? err.message : 'An unknown error occurred',
@@ -98,16 +94,11 @@ export default function ChangeEmailPage() {
         </CustomSubmitButton>
       </Box>
 
-      {verifyUrl && (
+      {confirmationMessage && (
         <Box sx={{ maxWidth: 400, mx: 'auto', mt: 3 }}>
-          <Typography variant="body1">
-            Check your new email address to verify the change... when that is implemented.
-          </Typography>
-          <Typography variant="body1" sx={{ mt: 1 }}>
-            For now, use this link:{' '}
-            <Link component={RouterLink} to={verifyUrl}>
-              Verify your new email
-            </Link>
+          <Typography variant="body1">{confirmationMessage}</Typography>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            Follow the confirmation link sent to your new email address.
           </Typography>
         </Box>
       )}

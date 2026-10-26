@@ -1,10 +1,13 @@
+import asyncio
 import pathlib
+import smtplib
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
 from fastapi import (
+    Depends,
     FastAPI,
     Header,
     HTTPException,
@@ -16,11 +19,14 @@ from fastapi.responses import FileResponse
 
 from config import settings
 from database import AsyncSessionLocal, engine
-from models import Base
+from models import Base, UserRole
 from routes.collections import router as collection_router
 from routes.media import router as media_router
 from routes.users import router as user_router
+from schemas import UserRetrievePrivate
+from utils.auth import get_current_user
 from utils.bootstrap import ensure_superuser
+from utils.email import send_test_email
 from utils.logging_config import logger, request_id_context
 
 
@@ -84,6 +90,37 @@ async def read_root(
         return {"message": "Witaj, Świecie!"}
 
     return {"message": "Hello, World!"}
+
+
+@app.post("/api/email_test")
+async def email_test(
+    request: Request,
+    current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
+) -> dict[str, str]:
+    if current_user.user_role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required.",
+        )
+
+    payload = await request.json()
+    recipient = str(payload["email"])
+    try:
+        await asyncio.to_thread(
+            send_test_email,
+            recipient,
+            payload["username"],
+            payload["note"],
+        )
+    except (OSError, smtplib.SMTPException) as error:
+        logger.exception("Failed to send test email")
+        print(error)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not deliver test email to the configured SMTP server.",
+        ) from error
+
+    return {"message": "Test email sent.", "recipient": recipient}
 
 
 frontend_dist = pathlib.Path(__file__).parent / "frontend" / "dist"

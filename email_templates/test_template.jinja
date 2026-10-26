@@ -1,0 +1,23 @@
+{% extends "base_email.jinja" %}
+
+{% macro subject() %}Inner Circle email test{% endmacro %}
+
+{% macro text_body() %}
+{% autoescape false %}
+Hello {{ username }},
+
+{{ note }}
+
+Sent to {{ recipient }}
+{% endautoescape %}
+{% endmacro %}
+
+{% block email_title %}Inner Circle email test{% endblock %}
+
+{% block content %}
+	<h1 style="margin: 0 0 20px; font-size: 24px;">Mailpit template check</h1>
+	<p style="margin: 0 0 16px;">Hello {{ username }},</p>
+	<p style="margin: 0 0 20px;">{{ note }}</p>
+	<hr style="border: 0; border-top: 1px solid #dce3df;">
+	<p style="margin: 16px 0 0; color: #58645e; font-size: 13px;">Sent to {{ recipient }}</p>
+{% endblock %}

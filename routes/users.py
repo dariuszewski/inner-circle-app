@@ -2,6 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from math import ceil
 from typing import Annotated
+from urllib.parse import quote
 
 from aiobotocore.client import AioBaseClient
 from fastapi import (
@@ -44,6 +45,7 @@ from schemas import (
     UserRetrievePublic,
     UserUpdateEmail,
     VerificationRequestResponse,
+    VerificationTokenRequest,
 )
 from storage import get_storage
 from utils.auth import (
@@ -59,15 +61,29 @@ from utils.auth import (
     is_refresh_token_valid,
     verify_password,
 )
-from utils.email import send_welcome_email
+from utils.email import (
+    send_account_deletion_email,
+    send_demo_elevation_email,
+    send_email_change_notice,
+    send_email_change_verification_email,
+    send_password_changed_email,
+    send_password_reset_email,
+    send_registration_verification_email,
+    send_welcome_email,
+)
 from utils.logging_config import logger
 from utils.media import get_media_type, get_upload_file_size
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 RESET_REQUEST_DETAIL = (
-    "If an account exists for this email, a reset link was generated."
+    "If an account exists for this email, a reset link has been sent."
 )
+
+
+def frontend_token_link(path: str, token: str) -> str:
+    base_url = settings.base_url.rstrip("/")
+    return f"{base_url}/{path}#token={quote(token, safe='')}"
 
 
 @router.get("")
@@ -226,14 +242,16 @@ async def create_user(
     )
     await db.commit()
 
-    # no email infra yet, so the verification link is returned directly instead of sent
-    verification_link = f"{settings.base_url}/api/users/verify/{raw_token}"
-    # start a background task to send a welcome email to the new user
-    background_tasks.add_task(send_welcome_email, new_user.email, new_user.username)
+    verification_link = frontend_token_link("verify", raw_token)
+    background_tasks.add_task(
+        send_registration_verification_email,
+        new_user.email,
+        new_user.username,
+        verification_link,
+    )
 
     return VerificationRequestResponse(
         detail="Registration successful. Please verify your account.",
-        verification_link=verification_link,
     )
 
 
@@ -272,13 +290,17 @@ async def register_demo_user_as_regular(
     )
     await db.commit()
 
-    verification_link = f"{settings.base_url}/api/users/verify/{raw_token}"
+    verification_link = frontend_token_link("verify", raw_token)
 
-    background_tasks.add_task(send_welcome_email, future_email, current_user.username)
+    background_tasks.add_task(
+        send_demo_elevation_email,
+        future_email,
+        current_user.username,
+        verification_link,
+    )
 
     return VerificationRequestResponse(
-        detail="Verification link generated for your new email.",
-        verification_link=verification_link,
+        detail="A verification email was sent to your new email address.",
     )
 
 
@@ -365,6 +387,7 @@ async def update_user(
 
 @router.post("/change-email")
 async def change_user_email(
+    background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_active_user)],
     email_change: Annotated[UserUpdateEmail, Body()],
@@ -406,18 +429,30 @@ async def change_user_email(
     db.add(token)
     await db.commit()
 
-    verification_link = f"{settings.base_url}/api/users/verify/{raw_token}"
+    verification_link = frontend_token_link("verify", raw_token)
 
-    # send email here and change response
+    background_tasks.add_task(
+        send_email_change_verification_email,
+        future_email,
+        user.username,
+        verification_link,
+        settings.verification_token_expire_hours,
+    )
+    background_tasks.add_task(
+        send_email_change_notice,
+        current_email,
+        user.username,
+        future_email,
+    )
 
     return VerificationRequestResponse(
-        detail="Verification link generated for your new email.",
-        verification_link=verification_link,
+        detail="A verification email was sent to your new email address.",
     )
 
 
 @router.post("/reset-password")
 async def request_password_reset(
+    background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
     email: Annotated[UserUpdateEmail, Body()],
 ) -> VerificationRequestResponse:
@@ -439,14 +474,17 @@ async def request_password_reset(
         db.add(token)
         await db.commit()
 
-        verification_link = f"{settings.base_url}/api/users/reset-password/{raw_token}"
+        verification_link = frontend_token_link("reset-password", raw_token)
 
-        # send email here and change response
-
-        return VerificationRequestResponse(
-            detail=RESET_REQUEST_DETAIL,
-            verification_link=verification_link,
+        background_tasks.add_task(
+            send_password_reset_email,
+            user.email,
+            user.username,
+            verification_link,
+            settings.verification_token_expire_hours,
         )
+
+        return VerificationRequestResponse(detail=RESET_REQUEST_DETAIL)
 
     # same detail for unknown emails so the response doesn't reveal which exist
     return VerificationRequestResponse(detail=RESET_REQUEST_DETAIL)
@@ -454,6 +492,7 @@ async def request_password_reset(
 
 @router.post("/reset-password/confirm")
 async def confirm_password_reset(
+    background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
     confirm: Annotated[PasswordResetConfirm, Body()],
 ) -> dict[str, str]:
@@ -486,11 +525,17 @@ async def confirm_password_reset(
     invalidate_refresh_token_family(active_tokens)
 
     await db.commit()
+    background_tasks.add_task(
+        send_password_changed_email,
+        user.email,
+        user.username,
+    )
     return {"detail": "Password reset successfully."}
 
 
 @router.post("/account-deletion")
 async def request_account_deletion(
+    background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_active_user)],
 ) -> VerificationRequestResponse:
@@ -510,22 +555,27 @@ async def request_account_deletion(
     db.add(token)
     await db.commit()
 
-    verification_link = f"{settings.base_url}/api/users/verify/{raw_token}"
-
-    # send email here and change response
+    verification_link = frontend_token_link("verify", raw_token)
+    background_tasks.add_task(
+        send_account_deletion_email,
+        user.email,
+        user.username,
+        verification_link,
+        settings.verification_token_expire_hours,
+    )
 
     return VerificationRequestResponse(
-        detail="Verification link generated for account deletion.",
-        verification_link=verification_link,
+        detail="A confirmation email was sent to your account email address.",
     )
 
 
-@router.get("/verify/{token}")
+@router.post("/verify")
 async def verify_verification_token(
-    token: str,
+    background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
+    request: Annotated[VerificationTokenRequest, Body()],
 ) -> dict[str, str]:
-    token_hash = hash_token(token)
+    token_hash = hash_token(request.token)
 
     result = await db.execute(
         select(VerificationToken).where(
@@ -549,6 +599,8 @@ async def verify_verification_token(
 
         verification.is_used = True
         await db.commit()
+        if user is not None:
+            background_tasks.add_task(send_welcome_email, user.email, user.username)
         return {"detail": "Account verified successfully."}
 
     elif verification.purpose == VerificationTokenPurpose.DEMO_USER_ELEVATION:
@@ -560,6 +612,7 @@ async def verify_verification_token(
 
         verification.is_used = True
         await db.commit()
+        background_tasks.add_task(send_welcome_email, user.email, user.username)
         return {"detail": "Account elevated successfully."}
 
     elif verification.purpose == VerificationTokenPurpose.EMAIL_CHANGE:

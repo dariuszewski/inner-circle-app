@@ -95,6 +95,7 @@ When changing SQLAlchemy models:
 ## Features
 
 - User registration and authentication
+- SMTP verification
 - Collection management
 - Media upload support
 - Comments and reactions on media
@@ -174,6 +175,13 @@ STORAGE_BUCKET_PROFILE_PICTURES=profile-pictures
 STORAGE_ACCESS_KEY=inner_circle
 STORAGE_SECRET_KEY=inner_circle
 STORAGE_REGION=us-east-1
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_USERNAME=
+SMTP_PASSWORD=
+SMTP_SECURE=false
+SMTP_FROM_EMAIL="noreply@inner-circle.local"
+SMTP_FROM_NAME="Inner Circle"
 ```
 
 

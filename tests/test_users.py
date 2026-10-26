@@ -17,10 +17,13 @@ from models import (
     VerificationToken,
     VerificationTokenPurpose,
 )
+from routes import users as user_routes
 from tests.conftest import (
     auth_header,
     create_test_superuser,
     create_test_user,
+    get_sent_token,
+    get_token_from_email_link,
     login_user,
 )
 from utils.auth import get_password_hash, hash_token
@@ -159,8 +162,8 @@ async def test_regular_user_must_verify_before_accessing_protected_endpoints(
         },
     )
     assert register_response.status_code == 201
-    verification_link = register_response.json()["verification_link"]
-    verification_token = verification_link.rsplit("/", 1)[-1]
+    assert "verification_link" not in register_response.json()
+    verification_token = get_sent_token("unverified_user@example.com", "verify")
 
     token = await login_user(client, "unverified_user", "StrongPass123!")
     headers = auth_header(token["access_token"])
@@ -168,7 +171,9 @@ async def test_regular_user_must_verify_before_accessing_protected_endpoints(
     blocked_response = await client.get("/api/users/me", headers=headers)
     assert blocked_response.status_code == 403
 
-    verify_response = await client.get(f"/api/users/verify/{verification_token}")
+    verify_response = await client.post(
+        "/api/users/verify", json={"token": verification_token}
+    )
     assert verify_response.status_code == 200
 
     me_response = await client.get("/api/users/me", headers=headers)
@@ -176,6 +181,52 @@ async def test_regular_user_must_verify_before_accessing_protected_endpoints(
     body = me_response.json()
     assert body["is_verified"] is True
     assert body["user_role"] == "regular"
+
+
+@pytest.mark.anyio
+async def test_registration_sends_verification_and_welcome_emails(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verification_emails: list[tuple[str, str, str]] = []
+    welcome_emails: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        user_routes,
+        "send_registration_verification_email",
+        lambda *args: verification_emails.append(args),
+    )
+    monkeypatch.setattr(
+        user_routes,
+        "send_welcome_email",
+        lambda *args: welcome_emails.append(args),
+    )
+
+    register_response = await client.post(
+        "/api/users/register",
+        json={
+            "username": "mail_flow_user",
+            "email": "mail_flow@example.com",
+            "password": "StrongPass123!",
+            "password2": "StrongPass123!",
+        },
+    )
+
+    assert register_response.status_code == 201
+    assert "verification_link" not in register_response.json()
+    verification_link = verification_emails[0][2]
+    assert verification_link.startswith(f"{settings.base_url}/verify#token=")
+    assert verification_emails == [
+        ("mail_flow@example.com", "mail_flow_user", verification_link)
+    ]
+    assert welcome_emails == []
+
+    verify_response = await client.post(
+        "/api/users/verify",
+        json={"token": get_token_from_email_link(verification_link)},
+    )
+
+    assert verify_response.status_code == 200
+    assert welcome_emails == [("mail_flow@example.com", "mail_flow_user")]
 
 
 @pytest.mark.anyio
@@ -205,7 +256,15 @@ async def test_demo_user_registration_skips_verification(
 @pytest.mark.anyio
 async def test_demo_user_can_register_email_and_verify_it(
     client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    elevation_emails: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        user_routes,
+        "send_demo_elevation_email",
+        lambda *args: elevation_emails.append(args),
+    )
+
     register_response = await client.post(
         "/api/users/register",
         json={
@@ -225,14 +284,21 @@ async def test_demo_user_can_register_email_and_verify_it(
         headers=headers,
     )
     assert email_response.status_code == 200
-    verification_token = email_response.json()["verification_link"].rsplit("/", 1)[-1]
+    assert "verification_link" not in email_response.json()
+    verification_link = elevation_emails[0][2]
+    verification_token = get_token_from_email_link(verification_link)
+    assert elevation_emails == [
+        ("upgrading_demo@example.com", "upgrading_demo", verification_link)
+    ]
 
     still_demo_response = await client.get("/api/users/me", headers=headers)
     assert still_demo_response.status_code == 200
     assert still_demo_response.json()["user_role"] == "demo"
     assert still_demo_response.json()["is_verified"] is False
 
-    verify_response = await client.get(f"/api/users/verify/{verification_token}")
+    verify_response = await client.post(
+        "/api/users/verify", json={"token": verification_token}
+    )
     assert verify_response.status_code == 200
 
     me_response = await client.get("/api/users/me", headers=headers)
@@ -309,10 +375,12 @@ async def test_regular_user_normal_registration_flow(
         },
     )
     assert register_response.status_code == 201
-    verification_link = register_response.json()["verification_link"]
-    verification_token = verification_link.rsplit("/", 1)[-1]
+    assert "verification_link" not in register_response.json()
+    verification_token = get_sent_token("flow_user@example.com", "verify")
 
-    verify_response = await client.get(f"/api/users/verify/{verification_token}")
+    verify_response = await client.post(
+        "/api/users/verify", json={"token": verification_token}
+    )
     assert verify_response.status_code == 200
 
     token = await login_user(client, "flow_user", "StrongPass123!")
@@ -335,7 +403,7 @@ async def test_regular_user_normal_registration_flow(
         "seed_conflict",
         "expected_status",
         "expected_detail",
-        "expect_link",
+        "expect_verification_email",
     ),
     [
         (
@@ -372,7 +440,7 @@ async def test_register_responses(
     seed_conflict: bool,
     expected_status: int,
     expected_detail: str,
-    expect_link: bool,
+    expect_verification_email: bool,
 ) -> None:
     if seed_conflict:
         assert email is not None
@@ -398,15 +466,14 @@ async def test_register_responses(
     assert response.status_code == expected_status
     body = response.json()
     assert body["detail"] == expected_detail
+    assert "verification_link" not in body
     if expected_status != 201:
         return
-    if expect_link:
-        assert body["verification_link"] is not None
-        assert body["verification_link"].startswith(
-            f"{settings.base_url}/api/users/verify/"
-        )
+    if expect_verification_email:
+        assert email is not None
+        assert get_sent_token(email, "verify")
     else:
-        assert body["verification_link"] is None
+        assert email is None
 
 
 @pytest.mark.anyio
@@ -450,7 +517,12 @@ async def test_register_demo_email_existing_email_returns_409(
 async def test_verify_registration_invalid_token_returns_400(
     client: AsyncClient,
 ) -> None:
-    response = await client.get("/api/users/verify/not-a-real-token")
+    path_token_response = await client.get("/api/users/verify/not-a-real-token")
+    assert path_token_response.status_code == 404
+
+    response = await client.post(
+        "/api/users/verify", json={"token": "not-a-real-token"}
+    )
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Invalid or expired verification link."
@@ -525,7 +597,23 @@ async def test_change_email_same_as_current_email(client: AsyncClient) -> None:
 
 
 @pytest.mark.anyio
-async def test_change_email_happy_path(client: AsyncClient) -> None:
+async def test_change_email_happy_path(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verification_emails: list[tuple[str, str, str, int]] = []
+    change_notices: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        user_routes,
+        "send_email_change_verification_email",
+        lambda *args: verification_emails.append(args),
+    )
+    monkeypatch.setattr(
+        user_routes,
+        "send_email_change_notice",
+        lambda *args: change_notices.append(args),
+    )
+
     await create_test_user(
         client, "email_user2", "email_user2@example.com", "StrongPass123!"
     )
@@ -539,9 +627,28 @@ async def test_change_email_happy_path(client: AsyncClient) -> None:
     )
 
     assert response.status_code == 200
-    verification_link = response.json()["verification_link"]
+    assert "verification_link" not in response.json()
+    verification_link = verification_emails[0][2]
+    assert verification_emails == [
+        (
+            "new_email_user2@example.com",
+            "email_user2",
+            verification_link,
+            settings.verification_token_expire_hours,
+        )
+    ]
+    assert change_notices == [
+        (
+            "email_user2@example.com",
+            "email_user2",
+            "new_email_user2@example.com",
+        )
+    ]
 
-    verify_response = await client.get(verification_link)
+    verify_response = await client.post(
+        "/api/users/verify",
+        json={"token": get_token_from_email_link(verification_link)},
+    )
     assert verify_response.status_code == 200
     assert verify_response.json()["detail"] == "Email changed successfully."
 
@@ -552,20 +659,37 @@ async def test_change_email_happy_path(client: AsyncClient) -> None:
 @pytest.mark.anyio
 async def test_request_password_reset_unknown_email_returns_generic_response(
     client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    reset_emails: list[tuple[str, str, str, int]] = []
+    monkeypatch.setattr(
+        user_routes,
+        "send_password_reset_email",
+        lambda *args: reset_emails.append(args),
+    )
+
     response = await client.post(
         "/api/users/reset-password", json={"email": "nobody@example.com"}
     )
 
     assert response.status_code == 200
-    assert response.json()["verification_link"] is None
+    assert "verification_link" not in response.json()
+    assert reset_emails == []
 
 
 @pytest.mark.anyio
 async def test_request_password_reset_happy_path(
     client: AsyncClient,
     db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    reset_emails: list[tuple[str, str, str, int]] = []
+    monkeypatch.setattr(
+        user_routes,
+        "send_password_reset_email",
+        lambda *args: reset_emails.append(args),
+    )
+
     await create_test_user(
         client, "reset_user", "reset_user@example.com", "StrongPass123!"
     )
@@ -577,11 +701,18 @@ async def test_request_password_reset_happy_path(
     assert response.status_code == 200
     body = response.json()
     assert body["detail"] == (
-        "If an account exists for this email, a reset link was generated."
+        "If an account exists for this email, a reset link has been sent."
     )
-    assert body["verification_link"].startswith(
-        f"{settings.base_url}/api/users/reset-password/"
-    )
+    assert "verification_link" not in body
+    reset_link = reset_emails[0][2]
+    assert reset_emails == [
+        (
+            "reset_user@example.com",
+            "reset_user",
+            reset_link,
+            settings.verification_token_expire_hours,
+        )
+    ]
 
     token = await db_session.scalar(
         select(VerificationToken).where(
@@ -605,13 +736,18 @@ async def test_verify_registration_token_cannot_be_reused(
             "password2": "StrongPass123!",
         },
     )
-    verification_link = register_response.json()["verification_link"]
+    assert "verification_link" not in register_response.json()
+    verification_token = get_sent_token("verify_reuse_user@example.com", "verify")
 
-    first_verify = await client.get(verification_link)
+    first_verify = await client.post(
+        "/api/users/verify", json={"token": verification_token}
+    )
     assert first_verify.status_code == 200
     assert first_verify.json()["detail"] == "Account verified successfully."
 
-    second_verify = await client.get(verification_link)
+    second_verify = await client.post(
+        "/api/users/verify", json={"token": verification_token}
+    )
     assert second_verify.status_code == 400
     assert second_verify.json()["detail"] == "Invalid or expired verification link."
 
@@ -640,9 +776,12 @@ async def test_verify_demo_elevation_happy_path(
         headers=headers,
     )
     assert elevate_response.status_code == 200
-    verification_link = elevate_response.json()["verification_link"]
+    assert "verification_link" not in elevate_response.json()
+    verification_token = get_sent_token("elevated_demo_user@example.com", "verify")
 
-    verify_response = await client.get(verification_link)
+    verify_response = await client.post(
+        "/api/users/verify", json={"token": verification_token}
+    )
     assert verify_response.status_code == 200
     assert verify_response.json()["detail"] == "Account elevated successfully."
 
@@ -668,12 +807,17 @@ async def test_verify_email_change_token_cannot_be_reused(
         json={"email": "new_email_reuse_user@example.com"},
         headers=headers,
     )
-    verification_link = change_response.json()["verification_link"]
+    assert "verification_link" not in change_response.json()
+    verification_token = get_sent_token("new_email_reuse_user@example.com", "verify")
 
-    first_verify = await client.get(verification_link)
+    first_verify = await client.post(
+        "/api/users/verify", json={"token": verification_token}
+    )
     assert first_verify.status_code == 200
 
-    second_verify = await client.get(verification_link)
+    second_verify = await client.post(
+        "/api/users/verify", json={"token": verification_token}
+    )
     assert second_verify.status_code == 400
     assert second_verify.json()["detail"] == "Invalid or expired verification link."
 
@@ -681,7 +825,15 @@ async def test_verify_email_change_token_cannot_be_reused(
 @pytest.mark.anyio
 async def test_confirm_password_reset_happy_path(
     client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    change_notices: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        user_routes,
+        "send_password_changed_email",
+        lambda *args: change_notices.append(args),
+    )
+
     await create_test_user(
         client, "reset_verify_user", "reset_verify_user@example.com", "StrongPass123!"
     )
@@ -691,7 +843,8 @@ async def test_confirm_password_reset_happy_path(
         "/api/users/reset-password", json={"email": "reset_verify_user@example.com"}
     )
     assert reset_response.status_code == 200
-    raw_token = reset_response.json()["verification_link"].rsplit("/", 1)[-1]
+    assert "verification_link" not in reset_response.json()
+    raw_token = get_sent_token("reset_verify_user@example.com", "reset")
 
     confirm_response = await client.post(
         "/api/users/reset-password/confirm",
@@ -704,6 +857,7 @@ async def test_confirm_password_reset_happy_path(
 
     assert confirm_response.status_code == 200
     assert confirm_response.json()["detail"] == "Password reset successfully."
+    assert change_notices == [("reset_verify_user@example.com", "reset_verify_user")]
 
     old_login = await client.post(
         "/api/users/token",
@@ -1085,10 +1239,15 @@ async def test_account_deletion_happy_path(
 
     assert response.status_code == 200
     body = response.json()
-    assert body["detail"] == "Verification link generated for account deletion."
-    verification_link = body["verification_link"]
+    assert body["detail"] == (
+        "A confirmation email was sent to your account email address."
+    )
+    assert "verification_link" not in body
+    verification_token = get_sent_token("deletion_user@example.com", "verify")
 
-    verify_response = await client.get(verification_link)
+    verify_response = await client.post(
+        "/api/users/verify", json={"token": verification_token}
+    )
     assert verify_response.status_code == 200
     assert verify_response.json()["detail"] == "Account deleted successfully."
 
@@ -1125,12 +1284,17 @@ async def test_verify_account_deletion_token_cannot_be_reused(
     headers = auth_header(token["access_token"])
 
     delete_response = await client.post("/api/users/account-deletion", headers=headers)
-    verification_link = delete_response.json()["verification_link"]
+    assert "verification_link" not in delete_response.json()
+    verification_token = get_sent_token("deletion_reuse_user@example.com", "verify")
 
-    first_verify = await client.get(verification_link)
+    first_verify = await client.post(
+        "/api/users/verify", json={"token": verification_token}
+    )
     assert first_verify.status_code == 200
     assert first_verify.json()["detail"] == "Account deleted successfully."
 
-    second_verify = await client.get(verification_link)
+    second_verify = await client.post(
+        "/api/users/verify", json={"token": verification_token}
+    )
     assert second_verify.status_code == 400
     assert second_verify.json()["detail"] == "Invalid or expired verification link."

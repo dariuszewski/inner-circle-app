@@ -1,6 +1,6 @@
 import { Box, CircularProgress, Link, Typography } from '@mui/material'
 import { useEffect, useRef, useState } from 'react'
-import { Link as RouterLink, useSearchParams } from 'react-router'
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router'
 
 import { verifyVerificationToken } from '../api/verification'
 import AnimatedLogo from '../components/AnimatedLogo'
@@ -8,7 +8,7 @@ import AnimatedLogo from '../components/AnimatedLogo'
 type VerificationStatus = 'pending' | 'success' | 'error'
 
 type VerifiedPageProps = {
-  /** token to verify; falls back to the `?token=` search param when omitted */
+  /** token to verify; falls back to the email-link hash when omitted */
   token?: string | null
   pendingTitle?: string
   successTitle?: string
@@ -18,7 +18,7 @@ type VerifiedPageProps = {
   footerLink?: { to: string; label: string } | null
   showLogo?: boolean
   /** called after the verification request succeeds (e.g. to refresh auth state) */
-  onVerified?: () => void
+  onVerified?: (detail: string) => void
 }
 
 // tokens are single-use, so dedupe the request across StrictMode's
@@ -45,8 +45,11 @@ export default function VerifiedPage({
   showLogo = true,
   onVerified,
 }: VerifiedPageProps) {
-  const [searchParams] = useSearchParams()
-  const token = tokenProp ?? searchParams.get('token')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [token] = useState(() =>
+    tokenProp ?? new URLSearchParams(location.hash.slice(1)).get('token'),
+  )
   const [status, setStatus] = useState<VerificationStatus>(token ? 'pending' : 'error')
   const [message, setMessage] = useState<string>(token ? '' : 'No verification token provided.')
 
@@ -56,6 +59,12 @@ const onVerifiedRef = useRef(onVerified)
   useEffect(() => {
     onVerifiedRef.current = onVerified
   }, [onVerified])
+
+  useEffect(() => {
+    if (location.hash) {
+      navigate(location.pathname, { replace: true })
+    }
+  }, [location.hash, location.pathname, navigate])
 
   useEffect(() => {
     if (!token) {
@@ -68,7 +77,7 @@ const onVerifiedRef = useRef(onVerified)
         if (cancelled) return
         setStatus('success')
         setMessage(response.detail)
-        onVerifiedRef.current?.()
+        onVerifiedRef.current?.(response.detail)
       })
       .catch((err) => {
         if (cancelled) return
@@ -82,8 +91,19 @@ const onVerifiedRef = useRef(onVerified)
   }, [token])
 
   return (
-    <>
-      {showLogo && <AnimatedLogo />}
+    <Box
+      sx={{
+        minHeight: {
+          xs: 'calc(100dvh - 24px)',
+          sm: 'calc(100dvh - 40px)',
+        },
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {showLogo && status === 'success' && <AnimatedLogo />}
       {status === 'pending' && (
         <>
           <Typography variant="h4" component="h1">
@@ -124,6 +144,6 @@ const onVerifiedRef = useRef(onVerified)
           </Link>
         </Typography>
       )}
-    </>
+    </Box>
   )
 }

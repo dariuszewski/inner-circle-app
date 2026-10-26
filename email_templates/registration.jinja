@@ -1,0 +1,20 @@
+{% extends "base_email.jinja" %}
+
+{% macro subject() %}Welcome to Inner Circle!{% endmacro %}
+
+{% macro text_body() %}
+{% autoescape false %}
+Hello {{ username }},
+
+Your email is verified and your Inner Circle account is ready.
+We're glad you're here.
+{% endautoescape %}
+{% endmacro %}
+
+{% block email_title %}Welcome to Inner Circle{% endblock %}
+
+{% block content %}
+	<h1 style="margin: 0 0 20px; font-size: 24px;">You're all set, {{ username }}!</h1>
+	<p style="margin: 0 0 16px;">Your email is verified and your Inner Circle account is ready.</p>
+	<p style="margin: 0;">We're glad you're here.</p>
+{% endblock %}

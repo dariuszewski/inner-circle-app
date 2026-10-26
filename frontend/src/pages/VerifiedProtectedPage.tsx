@@ -9,7 +9,11 @@ export default function VerifiedProtectedPage() {
 
   // after a successful email change / elevation, refresh the auth context user
   // (onVerified runs inside an effect downstream, so it is StrictMode-safe)
-  const onVerifiedRef = useRef(() => {
+  const onVerifiedRef = useRef((detail: string) => {
+    if (detail === 'Account deleted successfully.') {
+      void auth.logoutUser()
+      return
+    }
     if (!auth.accessToken) return
     getCurrentUser(auth.accessToken)
       .then(auth.updateUser)
@@ -20,7 +24,11 @@ export default function VerifiedProtectedPage() {
   })
 
   useEffect(() => {
-    onVerifiedRef.current = () => {
+    onVerifiedRef.current = (detail: string) => {
+      if (detail === 'Account deleted successfully.') {
+        void auth.logoutUser()
+        return
+      }
       if (!auth.accessToken) return
       getCurrentUser(auth.accessToken)
         .then(auth.updateUser)
@@ -33,8 +41,7 @@ export default function VerifiedProtectedPage() {
       pendingTitle="Verification in progress..."
       successTitle="Success"
       footerLink={{ to: '/collections', label: 'Back home' }}
-      showLogo={false}
-      onVerified={() => onVerifiedRef.current()}
+      onVerified={(detail) => onVerifiedRef.current(detail)}
     />
   )
 }

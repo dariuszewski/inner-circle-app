@@ -13,7 +13,7 @@ export default function ForgotPasswordPage() {
   const auth = useAuth()
   const [email, setEmail] = useState(auth.user?.email ?? '')
   const [isLoading, setIsLoading] = useState(false)
-  const [submitted, setSubmitted] = useState<{ detail: string; resetUrl: string | null } | null>(null)
+  const [submitted, setSubmitted] = useState<string | null>(null)
   const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'danger' } | null>(null)
 
   const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
@@ -22,12 +22,7 @@ export default function ForgotPasswordPage() {
     setSnackbar(null)
     try {
       const data = await requestPasswordReset(email)
-      // the backend link points at the API; route it through the frontend reset page instead
-      const token = data.verification_link?.split('/reset-password/').pop()
-      setSubmitted({
-        detail: data.detail,
-        resetUrl: token ? `/reset-password?token=${encodeURIComponent(token)}` : null,
-      })
+      setSubmitted(data.detail)
     } catch (error) {
       setSnackbar({
         message: error instanceof Error ? error.message : 'An unknown error occurred',
@@ -72,15 +67,7 @@ export default function ForgotPasswordPage() {
 
       {submitted && (
         <Box sx={{ maxWidth: 400, mx: 'auto', mt: 3 }}>
-          <Typography variant="body1">{submitted.detail}</Typography>
-          {submitted.resetUrl && (
-            <Typography variant="body1" sx={{ mt: 2 }}>
-              Check your email for the link... but after I add this feature. For now:{' '}
-              <Link component={RouterLink} to={submitted.resetUrl}>
-                Reset your password here
-              </Link>
-            </Typography>
-          )}
+          <Typography variant="body1">{submitted}</Typography>
         </Box>
       )}
 

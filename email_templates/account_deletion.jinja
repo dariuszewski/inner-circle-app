@@ -1,0 +1,25 @@
+{% extends "base_email.jinja" %}
+
+{% macro subject() %}Confirm deletion of your Inner Circle account{% endmacro %}
+
+{% macro text_body() %}
+{% autoescape false %}
+Hello {{ username }},
+
+Confirm deletion of your Inner Circle account:
+{{ verification_link }}
+
+This link expires in {{ expiry_hours }} hours. If you didn't request this, ignore this email.
+{% endautoescape %}
+{% endmacro %}
+
+{% block email_title %}Confirm account deletion | Inner Circle{% endblock %}
+
+{% block content %}
+	<h1 style="margin: 0 0 20px; font-size: 24px;">Confirm account deletion</h1>
+	<p style="margin: 0 0 20px;">Hello {{ username }}, confirm that you want to permanently delete your Inner Circle account.</p>
+	<p style="margin: 0 0 24px;">
+		<a href="{{ verification_link }}" style="display: inline-block; padding: 12px 18px; border-radius: 4px; background: #a83232; color: #ffffff; font-weight: bold; text-decoration: none;">Delete account</a>
+	</p>
+	<p style="margin: 0 0 16px; color: #58645e; font-size: 13px;">This link expires in {{ expiry_hours }} hours. If you didn't request this, ignore this email.</p>
+{% endblock %}

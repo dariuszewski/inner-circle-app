@@ -26,7 +26,6 @@ import RegisterPage from './pages/RegisterPage.tsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.tsx';
 import SettingsPage from './pages/SettingsPage.tsx';
 import UpdateProfilePage from './pages/UpdateProfilePage.tsx';
-import VerifiedPage from './pages/VerifiedPage.tsx';
 import VerifiedProtectedPage from './pages/VerifiedProtectedPage.tsx';
 import { AuthProvider } from './providers/AuthContextProvider.tsx';
 
@@ -45,6 +44,11 @@ const router = createBrowserRouter([
         element: <ResetPasswordPage />,
       },
       {
+        // Email links must work for guests and authenticated users.
+        path: '/verify',
+        element: <VerifiedProtectedPage />,
+      },
+      {
         Component: GuestLayout,
         hydrateFallbackElement: <div />,
         children: [
@@ -60,10 +64,6 @@ const router = createBrowserRouter([
           {
             path: '/check-email',
             element: <CheckEmailPage />,
-          },
-          {
-            path: '/verify',
-            element: <VerifiedPage />,
           },
           {
             path: '/login',

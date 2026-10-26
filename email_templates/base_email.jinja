@@ -1,0 +1,24 @@
+{% set logo_cid = logo_cid if logo_cid is defined else 'none' %}
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>{% block email_title %}Inner Circle{% endblock %}</title>
+	</head>
+	<body style="margin: 0; padding: 32px 16px; background: #f3f5f4; color: #202724; font-family: Arial, sans-serif;">
+		<main style="max-width: 560px; margin: 0 auto; padding: 28px; background: #ffffff; border: 1px solid #dce3df; border-radius: 8px;">
+			<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 24px; border-collapse: collapse;">
+				<tr>
+					<td style="padding: 0 12px 0 0; vertical-align: middle;">
+						<img src="cid:{{ logo_cid }}" alt="" width="40" height="40" style="display: block;">
+					</td>
+					<td style="vertical-align: middle; color: #287354; font-size: 18px; font-weight: bold; line-height: 1;">
+						INNER CIRCLE
+					</td>
+				</tr>
+			</table>
+			{% block content %}{% endblock %}
+		</main>
+	</body>
+</html>

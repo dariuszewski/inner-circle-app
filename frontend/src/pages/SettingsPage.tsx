@@ -17,7 +17,6 @@ import {
   DialogTitle,
   Divider,
   IconButton,
-  Link,
   List,
   ListItemButton,
   ListItemIcon,
@@ -26,7 +25,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
-import { Link as RouterLink, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 
 import { requestAccountDeletion } from '../api/user'
 import SlidingSnackbar from '../components/SlidingSnackbar'
@@ -39,7 +38,6 @@ type SnackbarState = {
 
 type DeletionResult = {
   detail: string
-  verifyUrl: string | null
 }
 
 export default function SettingsPage() {
@@ -57,12 +55,9 @@ export default function SettingsPage() {
     setIsDeleting(true)
     try {
       const response = await requestAccountDeletion(auth.accessToken)
-      // the backend link points at the API; route it through the frontend verify page instead
-      const token = response.verification_link?.split('/verify/').pop()
       setConfirmOpen(false)
       setDeletionResult({
         detail: response.detail,
-        verifyUrl: token ? `/verify?token=${encodeURIComponent(token)}` : null,
       })
     } catch (error) {
       setConfirmOpen(false)
@@ -137,7 +132,7 @@ export default function SettingsPage() {
           </ListItemButton>
           {isDemoUser && (
             // TODO: wire up to PATCH /api/users/elevate-demo
-            <ListItemButton onClick={() => navigate('/settings/verify-account')}>
+            <ListItemButton onClick={() => navigate('/settings/elevate-demo')}>
               <ListItemIcon>
                 <VerifiedUserIcon fontSize="small" />
               </ListItemIcon>
@@ -192,14 +187,9 @@ export default function SettingsPage() {
         <DialogTitle>Confirm account deletion</DialogTitle>
         <DialogContent>
           <DialogContentText>{deletionResult?.detail}</DialogContentText>
-          {deletionResult?.verifyUrl && (
-            <DialogContentText sx={{ mt: 2 }}>
-              Email sending is not wired up yet, so for now:{' '}
-              <Link component={RouterLink} to={deletionResult.verifyUrl}>
-                Confirm account deletion here
-              </Link>
-            </DialogContentText>
-          )}
+          <DialogContentText sx={{ mt: 2 }}>
+            Check your email for the confirmation link. It is not included here for security.
+          </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeletionResult(null)}>Close</Button>

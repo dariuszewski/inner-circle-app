@@ -1,6 +1,5 @@
 export type VerificationRequestResponse = {
     detail: string;
-    verification_link: string | null;
 };
 
 async function parseError(response: Response, fallback: string): Promise<Error> {

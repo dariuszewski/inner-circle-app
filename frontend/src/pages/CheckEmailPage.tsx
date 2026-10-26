@@ -6,19 +6,19 @@ import AnimatedLogo from '../components/AnimatedLogo'
 
 export default function CheckEmailPage() {
   const location = useLocation()
-  const verificationLink = location.state?.verificationLink || null
-  const detail = location.state?.detail || null
+  const state = location.state as {
+    detail?: string
+    email?: string | null
+    verificationRequired?: boolean
+  } | null
+  const detail = state?.detail ?? null
   const navigate = useNavigate()
 
-  // the backend link points at the API; route it through the frontend verify page instead
-  const token = verificationLink?.split('/verify/').pop()
-  const verifyUrl = token ? `/verify?token=${encodeURIComponent(token)}` : null
-
   useEffect(() => {
-    if (!verificationLink && !detail) {
+    if (!detail) {
       navigate('/')
     }
-  }, [verificationLink, detail, navigate])
+  }, [detail, navigate])
 
   return (
     <>
@@ -27,18 +27,13 @@ export default function CheckEmailPage() {
         Congratulations!
       </Typography>
       <Box sx={{ maxWidth: 400, mx: 'auto', mt: 3 }}>
-        {verificationLink ? (
+        {state?.verificationRequired ? (
             <>
                 <Typography variant="body1" sx={{ mt: 2 }}>
                     Your account has been created.
                 </Typography>
                 <Typography variant="body1" sx={{ mt: 2 }}>
-                    Please check your email for a verification link... but after I add this feature. For now:
-                </Typography>
-                <Typography variant="body1" sx={{ mt: 2 }}>
-                    {verifyUrl && (
-                        <Link component={RouterLink} to={verifyUrl}>Verify your account here</Link>
-                    )}
+              Check {state.email} for a verification link to activate your account.
                 </Typography>
             </>
         ) : (
