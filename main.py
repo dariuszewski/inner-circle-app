@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
 from fastapi import (
+    Body,
     Depends,
     FastAPI,
     Header,
@@ -16,6 +17,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from pydantic import EmailStr
 
 from config import settings
 from database import AsyncSessionLocal, engine
@@ -94,7 +96,9 @@ async def read_root(
 
 @app.post("/api/email_test")
 async def email_test(
-    request: Request,
+    email: Annotated[EmailStr, Body()],
+    username: Annotated[str, Body(min_length=1, max_length=80)],
+    note: Annotated[str, Body(min_length=1, max_length=500)],
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
 ) -> dict[str, str]:
     if current_user.user_role != UserRole.ADMIN:
@@ -103,14 +107,13 @@ async def email_test(
             detail="Admin privileges required.",
         )
 
-    payload = await request.json()
-    recipient = str(payload["email"])
+    recipient = str(email)
     try:
         await asyncio.to_thread(
             send_test_email,
             recipient,
-            payload["username"],
-            payload["note"],
+            username,
+            note,
         )
     except (OSError, smtplib.SMTPException) as error:
         logger.exception("Failed to send test email")
