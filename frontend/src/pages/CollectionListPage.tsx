@@ -134,7 +134,7 @@ export default function CollectionListPage() {
           ))}
         </>
       )}
-      {data?.total_pages && data.total_pages > 1 && (
+      {data && data.total_pages > 1 && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
           <Pagination
             count={data.total_pages}
