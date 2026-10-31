@@ -27,4 +27,11 @@ export default defineConfig([
       'simple-import-sort/exports': 'error',
     },
   },
+  {
+    // entry point has no exports, so lazy() route components trip the rule
+    files: ['src/main.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

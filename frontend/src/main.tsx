@@ -1,33 +1,40 @@
 import '@fontsource/saira/400.css';
 import '@fontsource/saira/700.css';
 
+import Box from '@mui/material/Box';
 import CssBaseline from '@mui/material/CssBaseline';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { StrictMode } from 'react';
+import { lazy,Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
 
+import AnimatedLogo from './components/AnimatedLogo.tsx';
 import AppLayout from './layouts/AppLayout.tsx';
 import GuestLayout from './layouts/GuestLayout.tsx';
 import RootLayout from './layouts/RootLayout.tsx';
 import homeLoader from './loaders/homeLoader.ts';
-import CheckEmailPage from './pages/auth/CheckEmailPage.tsx';
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.tsx';
-import LoginPage from './pages/auth/LoginPage.tsx';
-import RegisterPage from './pages/auth/RegisterPage.tsx';
-import ResetPasswordPage from './pages/auth/ResetPasswordPage.tsx';
 import CollectionListPage from './pages/CollectionListPage.tsx';
 import CollectionPage from './pages/CollectionPage.tsx';
 import HomePage from './pages/HomePage.tsx';
 import InvitePage from './pages/InvitePage.tsx';
 import NotFoundPage from './pages/NotFoundPage.tsx';
-import ChangeEmailPage from './pages/settings/ChangeEmailPage.tsx';
-import ElevateDemoPage from './pages/settings/ElevateDemoPage.tsx';
-import SettingsPage from './pages/settings/SettingsPage.tsx';
-import UpdateProfilePage from './pages/settings/UpdateProfilePage.tsx';
 import VerifyEmailLinkPage from './pages/verification/VerifyEmailLinkPage.tsx';
 import { AuthProvider } from './providers/AuthContextProvider.tsx';
+
+// auth routes loaded when needed
+const CheckEmailPage = lazy(() => import('./pages/auth/CheckEmailPage.tsx'));
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage.tsx'));
+const LoginPage = lazy(() => import('./pages/auth/LoginPage.tsx'));
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage.tsx'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage.tsx'));
+
+// settings routes loaded when needed
+const ChangeEmailPage = lazy(() => import('./pages/settings/ChangeEmailPage.tsx'));
+const ElevateDemoPage = lazy(() => import('./pages/settings/ElevateDemoPage.tsx'));
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage.tsx'));
+const UpdateProfilePage = lazy(() => import('./pages/settings/UpdateProfilePage.tsx'));
 
 const router = createBrowserRouter([
   {
@@ -179,8 +186,23 @@ createRoot(document.getElementById('root')!).render(
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <AuthProvider>
-        <RouterProvider router={router} />
+        <Suspense
+          fallback={
+            <Box
+              sx={{
+                minHeight: '100dvh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <AnimatedLogo />
+            </Box>
+          }
+        >
+          <RouterProvider router={router} />
+        </Suspense>
       </AuthProvider>
     </ThemeProvider>
-  </StrictMode>,
+  </StrictMode>
 )
