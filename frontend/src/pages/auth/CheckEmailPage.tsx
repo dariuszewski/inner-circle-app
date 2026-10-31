@@ -2,7 +2,7 @@ import { Box, Link, Typography } from '@mui/material'
 import { useEffect } from 'react'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router'
 
-import AnimatedLogo from '../components/AnimatedLogo'
+import AnimatedLogo from '../../components/AnimatedLogo'
 
 export default function CheckEmailPage() {
   const location = useLocation()

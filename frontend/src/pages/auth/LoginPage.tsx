@@ -3,10 +3,10 @@ import type { SubmitEventHandler } from 'react'
 import { useState } from 'react'
 import { Link as RouterLink } from 'react-router'
 
-import { getCurrentUser, login } from '../api/auth'
-import AnimatedLogo from '../components/AnimatedLogo'
-import SlidingSnackbar from '../components/SlidingSnackbar'
-import { useAuth } from '../providers/useAuth'
+import { getCurrentUser, login } from '../../api/auth'
+import AnimatedLogo from '../../components/AnimatedLogo'
+import SlidingSnackbar from '../../components/SlidingSnackbar'
+import { useAuth } from '../../providers/useAuth'
 
 export default function LoginPage() {
   const auth = useAuth()

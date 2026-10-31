@@ -6,10 +6,11 @@ import { MuiFileInput } from 'mui-file-input'
 import type { SubmitEventHandler } from 'react'
 import { useState } from 'react'
 
-import CustomSubmitButton from '../components/CustomSubmitButton'
-import SlidingSnackbar from '../components/SlidingSnackbar'
-import { useAuth } from '../providers/useAuth'
-import type { UserResponsePrivate } from '../types/userResponse'
+import { updateUserRequest } from '../../api/user'
+import AnimatedLogo from '../../components/AnimatedLogo'
+import CustomSubmitButton from '../../components/CustomSubmitButton'
+import SlidingSnackbar from '../../components/SlidingSnackbar'
+import { useAuth } from '../../providers/useAuth'
 
 
 export default function UpdateProfilePage() {
@@ -31,37 +32,10 @@ export default function UpdateProfilePage() {
       if (!auth.accessToken) {
         throw new Error('You are not authenticated.')
       }
-      const formData = new FormData()
-      formData.append('username', username)
-      if (profileImage) {
-        formData.append('profile_image', profileImage)
-      }
-
-      const res = await fetch('/api/users/update', {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${auth.accessToken}`,
-        },
-        body: formData,
+      const updatedUser = await updateUserRequest(auth.accessToken, {
+        username,
+        profile_image: profileImage ?? undefined,
       })
-      if (!res.ok) {
-        let message = `HTTP error! Status: ${res.status}`
-        try {
-          const body: unknown = await res.json()
-          if (
-            typeof body === 'object' &&
-            body !== null &&
-            'detail' in body &&
-            typeof (body as { detail: unknown }).detail === 'string'
-          ) {
-            message = (body as { detail: string }).detail
-          }
-        } catch {
-          // body was not JSON, keep the generic status message
-        }
-        throw new Error(message)
-      }
-      const updatedUser = await res.json() as UserResponsePrivate
       auth.updateUser(updatedUser)
       setSnackbar({ message: 'Profile updated successfully.', severity: 'success' })
     } catch (err) {
@@ -76,6 +50,7 @@ export default function UpdateProfilePage() {
 
   return (
     <>
+        <AnimatedLogo />
         <Typography variant="h4" component="h1">
             <BadgeIcon fontSize="medium" /> Update Profile
         </Typography>

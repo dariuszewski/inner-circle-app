@@ -4,10 +4,10 @@ import type { SubmitEventHandler } from 'react'
 import { useEffect, useState } from 'react'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router'
 
-import { confirmPasswordReset } from '../api/auth'
-import AnimatedLogo from '../components/AnimatedLogo'
-import CustomSubmitButton from '../components/CustomSubmitButton'
-import SlidingSnackbar from '../components/SlidingSnackbar'
+import { confirmPasswordReset } from '../../api/auth'
+import AnimatedLogo from '../../components/AnimatedLogo'
+import CustomSubmitButton from '../../components/CustomSubmitButton'
+import SlidingSnackbar from '../../components/SlidingSnackbar'
 
 
 export default function ResetPasswordPage() {
@@ -93,6 +93,7 @@ export default function ResetPasswordPage() {
 
   return (
     <>
+        <AnimatedLogo />
         <Typography variant="h4" component="h1">
             <PasswordIcon fontSize="medium" /> Reset Password
         </Typography>

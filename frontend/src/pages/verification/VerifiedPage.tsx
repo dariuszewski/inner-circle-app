@@ -2,8 +2,8 @@ import { Box, CircularProgress, Link, Typography } from '@mui/material'
 import { useEffect, useRef, useState } from 'react'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router'
 
-import { verifyVerificationToken } from '../api/verification'
-import AnimatedLogo from '../components/AnimatedLogo'
+import { verifyVerificationToken } from '../../api/verification'
+import AnimatedLogo from '../../components/AnimatedLogo'
 
 type VerificationStatus = 'pending' | 'success' | 'error'
 

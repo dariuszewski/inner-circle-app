@@ -3,9 +3,9 @@ import type { SubmitEventHandler } from 'react'
 import { useState } from 'react'
 import { Link as RouterLink, useNavigate } from 'react-router'
 
-import { register } from '../api/auth'
-import AnimatedLogo from '../components/AnimatedLogo'
-import SlidingSnackbar from '../components/SlidingSnackbar'
+import { register } from '../../api/auth'
+import AnimatedLogo from '../../components/AnimatedLogo'
+import SlidingSnackbar from '../../components/SlidingSnackbar'
 
 export default function RegisterPage() {
 
@@ -19,11 +19,6 @@ export default function RegisterPage() {
     const password = formData.get('password') as string
     const password2 = formData.get('confirm-password') as string
     const email = formData.get('email') as string | null
-
-    if (password !== password2) {
-      setError("Passwords do not match.")
-      return
-    }
 
     try {
       const response = await register({ username, password, password2, email: email || undefined })

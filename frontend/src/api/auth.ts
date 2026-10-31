@@ -87,6 +87,19 @@ export async function logout(refreshToken: string): Promise<void> {
 }
 
 export async function register({ username, password, password2, email }: RegisterInput): Promise<RegisterResponse> {
+    // input validation
+    if (username.trim().length < 3) {
+        throw new Error('Username is too short.');
+    }
+
+    if (username.trim().length > 30) {
+        throw new Error('Username is too long.');
+    }
+
+    if (password !== password2) {
+        throw new Error('Passwords do not match.');
+    }
+
     const response = await fetch('/api/users/register', {
         method: 'POST',
         headers: {
@@ -96,7 +109,9 @@ export async function register({ username, password, password2, email }: Registe
     });
 
     if (!response.ok) {
-        throw new Error('Registration failed');
+        // get the fastapi error message if available
+        const errorMessage = await getErrorMessage(response, 'Registration failed');
+        throw new Error(errorMessage);
     }
 
     return response.json();
@@ -133,6 +148,9 @@ export async function requestPasswordReset(email: string): Promise<RegisterRespo
 export async function confirmPasswordReset(
     { token, password, password2 }: { token: string; password: string; password2: string },
 ): Promise<void> {
+    if (password !== password2) {
+        throw new Error('Passwords do not match.');
+    }
     const response = await fetch('/api/users/reset-password/confirm', {
         method: 'POST',
         headers: {

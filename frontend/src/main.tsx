@@ -12,21 +12,21 @@ import AppLayout from './layouts/AppLayout.tsx';
 import GuestLayout from './layouts/GuestLayout.tsx';
 import RootLayout from './layouts/RootLayout.tsx';
 import homeLoader from './loaders/homeLoader.ts';
-import ChangeEmailPage from './pages/ChangeEmailPage.tsx';
-import CheckEmailPage from './pages/CheckEmailPage.tsx';
+import CheckEmailPage from './pages/auth/CheckEmailPage.tsx';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.tsx';
+import LoginPage from './pages/auth/LoginPage.tsx';
+import RegisterPage from './pages/auth/RegisterPage.tsx';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage.tsx';
 import CollectionListPage from './pages/CollectionListPage.tsx';
 import CollectionPage from './pages/CollectionPage.tsx';
-import ElevateDemoPage from './pages/ElevateDemoPage.tsx';
-import ForgotPasswordPage from './pages/ForgotPasswordPage.tsx';
 import HomePage from './pages/HomePage.tsx';
 import InvitePage from './pages/InvitePage.tsx';
-import LoginPage from './pages/LoginPage.tsx';
 import NotFoundPage from './pages/NotFoundPage.tsx';
-import RegisterPage from './pages/RegisterPage.tsx';
-import ResetPasswordPage from './pages/ResetPasswordPage.tsx';
-import SettingsPage from './pages/SettingsPage.tsx';
-import UpdateProfilePage from './pages/UpdateProfilePage.tsx';
-import VerifiedProtectedPage from './pages/VerifiedProtectedPage.tsx';
+import ChangeEmailPage from './pages/settings/ChangeEmailPage.tsx';
+import ElevateDemoPage from './pages/settings/ElevateDemoPage.tsx';
+import SettingsPage from './pages/settings/SettingsPage.tsx';
+import UpdateProfilePage from './pages/settings/UpdateProfilePage.tsx';
+import VerifyEmailLinkPage from './pages/verification/VerifyEmailLinkPage.tsx';
 import { AuthProvider } from './providers/AuthContextProvider.tsx';
 
 const router = createBrowserRouter([
@@ -46,7 +46,7 @@ const router = createBrowserRouter([
       {
         // Email links must work for guests and authenticated users.
         path: '/verify',
-        element: <VerifiedProtectedPage />,
+        element: <VerifyEmailLinkPage />,
       },
       {
         Component: GuestLayout,
@@ -114,7 +114,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/settings/verify',
-        element: <VerifiedProtectedPage />,
+        element: <VerifyEmailLinkPage />,
       },
     ],
   }

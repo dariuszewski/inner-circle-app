@@ -27,9 +27,9 @@ import {
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { requestAccountDeletion } from '../api/user'
-import SlidingSnackbar from '../components/SlidingSnackbar'
-import { useAuth } from '../providers/useAuth'
+import { requestAccountDeletion } from '../../api/user'
+import SlidingSnackbar from '../../components/SlidingSnackbar'
+import { useAuth } from '../../providers/useAuth'
 
 type SnackbarState = {
   message: string

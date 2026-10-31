@@ -3,10 +3,11 @@ import { Box, TextField, Typography } from '@mui/material'
 import type { SubmitEventHandler } from 'react'
 import { useState } from 'react'
 
-import type { VerificationRequestResponse } from '../api/user'
-import CustomSubmitButton from '../components/CustomSubmitButton'
-import SlidingSnackbar from '../components/SlidingSnackbar'
-import { useAuth } from '../providers/useAuth'
+import type { VerificationRequestResponse } from '../../api/user'
+import AnimatedLogo from '../../components/AnimatedLogo'
+import CustomSubmitButton from '../../components/CustomSubmitButton'
+import SlidingSnackbar from '../../components/SlidingSnackbar'
+import { useAuth } from '../../providers/useAuth'
 
 
 export default function ChangeEmailPage() {
@@ -64,6 +65,7 @@ export default function ChangeEmailPage() {
 
   return (
     <>
+        <AnimatedLogo />
         <Typography variant="h4" component="h1">
             <AlternateEmailIcon fontSize="medium" /> Change Email
         </Typography>
