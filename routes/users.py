@@ -309,7 +309,9 @@ async def update_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     s3: Annotated[AioBaseClient, Depends(get_storage)],
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_active_user)],
-    username: Annotated[str | None, Form()] = None,
+    username: Annotated[
+        str | None, Form(min_length=3, max_length=30, strip_whitespace=True)
+    ] = None,
     profile_image: Annotated[UploadFile | None, File()] = None,
 ) -> UserRetrievePrivate:
 

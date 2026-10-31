@@ -576,6 +576,24 @@ async def test_update_user(
 
 
 @pytest.mark.anyio
+async def test_update_user_rejects_short_username(client: AsyncClient) -> None:
+    await create_test_user(
+        client, "short_user", "short_user@example.com", "StrongPass123!"
+    )
+    token = await login_user(client, "short_user", "StrongPass123!")
+    headers = auth_header(token["access_token"])
+
+    response = await client.patch(
+        "/api/users/update", data={"username": "ab"}, headers=headers
+    )
+    assert response.status_code == 422
+
+    me_response = await client.get("/api/users/me", headers=headers)
+    assert me_response.status_code == 200
+    assert me_response.json()["username"] == "short_user"
+
+
+@pytest.mark.anyio
 async def test_change_email_same_as_current_email(client: AsyncClient) -> None:
     await create_test_user(
         client, "email_user", "email_user@example.com", "StrongPass123!"
