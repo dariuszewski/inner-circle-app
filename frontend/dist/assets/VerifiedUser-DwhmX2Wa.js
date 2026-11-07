@@ -1,0 +1,1 @@
+import{z as e}from"./Typography-huQiXw8K.js";import{P as t}from"./SlidingSnackbar-BmLU2SjR.js";var n=e(),r=t((0,n.jsx)(`path`,{d:`M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5zm-2 16-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9z`}),`VerifiedUser`);export{r as t};

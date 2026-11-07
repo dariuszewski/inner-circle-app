@@ -142,6 +142,7 @@ class MediaRetrieve(MediaBase):
     id: int
     collection_id: int
     uploaded_at: datetime
+    popularity_score: int = 0
     uploaded_by: UserRetrievePublic | None
 
     @computed_field
@@ -159,8 +160,8 @@ class MediaRetrieveDetailed(MediaRetrieve):
 
 
 class CollectionBase(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
-    description: str | None = Field(default=None, max_length=500)
+    name: str = Field(min_length=1, max_length=50)
+    description: str | None = Field(default=None, max_length=300)
 
 
 class CollectionCreate(CollectionBase):
@@ -168,8 +169,8 @@ class CollectionCreate(CollectionBase):
 
 
 class CollectionUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=100)
-    description: str | None = Field(default=None, max_length=500)
+    name: str | None = Field(default=None, min_length=1, max_length=50)
+    description: str | None = Field(default=None, max_length=300)
     cover_image_id: int | None = Field(
         default=None, description="ID of the cover image media"
     )

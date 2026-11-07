@@ -20,7 +20,7 @@ wheels/
 uploads/
 .env
 prod.env
-requests.log
+requests.log*
 dev.db
 test.db
 todo.txt

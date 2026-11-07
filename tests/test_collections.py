@@ -5,7 +5,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import CollectionInvitation
+from models import CollectionInvitation, Comment, Reaction, ReactionType
 from tests.conftest import (
     add_user_to_collection_members,
     auth_header,
@@ -77,6 +77,51 @@ async def test_get_collections_and_filters(
     )
     assert len(response.json()["items"]) == 1
     assert response.json()["total_items"] == 1
+
+
+@pytest.mark.anyio
+async def test_get_collection_media_counts(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user = await create_test_user(
+        client,
+        username="counts_user",
+        email="counts_user@example.com",
+        password="StrongPass123!",
+    )
+    token = await login_user(client, user["username"], "StrongPass123!")
+    headers = auth_header(token["access_token"])
+
+    collection = await client.post(
+        "/api/collections", json={"name": "Counts"}, headers=headers
+    )
+    collection_id = collection.json()["id"]
+
+    upload = await client.post(
+        "/api/media",
+        params={"collection_id": collection_id},
+        files=[
+            ("files", (f"photo{i}.jpg", b"fake-image-data", "image/jpeg"))
+            for i in range(3)
+        ],
+        headers=headers,
+    )
+    assert upload.status_code == 201
+    empty_id, liked_id, popular_id = sorted(item["id"] for item in upload.json())
+
+    db_session.add_all(
+        [
+            Reaction(type=ReactionType.LIKE, media_id=liked_id, user_id=user["id"]),
+            Reaction(type=ReactionType.LIKE, media_id=popular_id, user_id=user["id"]),
+            Comment(content="Nice", media_id=popular_id, author_id=user["id"]),
+        ]
+    )
+    await db_session.commit()
+
+    response = await client.get(f"/api/collections/{collection_id}", headers=headers)
+    assert response.status_code == 200
+    stats = {item["id"]: item["popularity_score"] for item in response.json()["media"]}
+    assert stats == {empty_id: 0, liked_id: 1, popular_id: 2}
 
 
 @pytest.mark.anyio

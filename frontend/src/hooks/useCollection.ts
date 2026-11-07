@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { getCollection } from '../api/collection'
 import { useAuth } from '../providers/useAuth'
 import type { CollectionDetailedRetrieve } from '../types/collectionResponse'
+import type { MediaFilters } from '../types/mediaFilters'
 
 type CollectionState = {
   data: CollectionDetailedRetrieve | null
@@ -14,6 +15,7 @@ type CollectionState = {
 
 export function useCollection(
   collectionId?: string,
+  filters?: MediaFilters,
 ): CollectionState {
   const auth = useAuth()
 
@@ -39,6 +41,7 @@ export function useCollection(
       const data = await getCollection({
         collectionId,
         accessToken: auth.accessToken,
+        filters,
         signal: controller.signal,
       })
 
@@ -65,7 +68,7 @@ export function useCollection(
         activeRequest.current = null
       }
     }
-  }, [auth.accessToken, collectionId])
+  }, [auth.accessToken, collectionId, filters])
 
   const refetch = useCallback(async () => {
     setState((previous) => ({

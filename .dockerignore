@@ -39,7 +39,7 @@ frontend/
 
 # Logs & Temporary files
 *.log
-requests.log
+requests.log*
 todo.txt
 
 # Test coverage & Reports

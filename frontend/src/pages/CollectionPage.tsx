@@ -1,6 +1,7 @@
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import EditIcon from '@mui/icons-material/Edit'
+import FilterAltIcon from '@mui/icons-material/FilterAlt'
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -23,22 +24,25 @@ import CollectionItem from '../components/CollectionItem'
 import CustomIconButton from '../components/CustomIconButton'
 import EditCollectionDialog from '../components/EditCollectionDialog'
 import InviteDialog from '../components/InviteDialog'
+import MediaFilterBar from '../components/MediaFilterBar'
 import MediaGalleryViewer from '../components/MediaGalleryViewer'
 import MembersSummary from '../components/MembersSummary'
 import SlidingSnackbar from '../components/SlidingSnackbar'
 import { useCollection } from '../hooks/useCollection'
 import { useAuth } from '../providers/useAuth'
+import { defaultMediaFilters, type MediaFilters } from '../types/mediaFilters'
 
 function CollectionPage() {
     const { collectionId } = useParams<{ collectionId: string }>()
     const auth = useAuth()
     const navigate = useNavigate()
+    const [filters, setFilters] = useState<MediaFilters>(defaultMediaFilters)
     const {
         data: collection,
         isLoading: loading,
         error,
         refetch,
-    } = useCollection(collectionId)
+    } = useCollection(collectionId, filters)
     const [uploading, setUploading] = useState(false)
     const [mediaPage, setMediaPage] = useState(1)
     const [activeMediaIndex, setActiveMediaIndex] = useState<number | null>(null)
@@ -46,6 +50,7 @@ function CollectionPage() {
     const [deletingMedia, setDeletingMedia] = useState(false)
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
     const [editDialogOpen, setEditDialogOpen] = useState(false)
+    const [filterBarOpen, setFilterBarOpen] = useState(false)
     const [snackbar, setSnackbar] = useState<{
         message: string
         severity: 'success' | 'danger'
@@ -212,6 +217,13 @@ function CollectionPage() {
                     )}
 
                     <CustomIconButton
+                        onClick={() => setFilterBarOpen((open) => !open)}
+                        ariaLabel="sort and filter"
+                    >
+                        <FilterAltIcon />
+                    </CustomIconButton>
+
+                    <CustomIconButton
                         component="label"
                         ariaLabel="add media"
                         isLoading={uploading}
@@ -246,6 +258,16 @@ function CollectionPage() {
                     itemsCount={collection.media.length}
                 />
             )}
+            <MediaFilterBar
+                open={filterBarOpen}
+                value={filters}
+                onChange={(next) => {
+                    setFilters(next)
+                    setMediaPage(1)
+                }}
+                members={collection?.members ?? []}
+                onHide={() => setFilterBarOpen(false)}
+            />
             <Box
                 sx={{
                     display: 'grid',

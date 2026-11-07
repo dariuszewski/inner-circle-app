@@ -119,7 +119,9 @@ async def get_media(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Media not found or access denied.",
         )
-    return MediaRetrieveDetailed.model_validate(media)
+    return MediaRetrieveDetailed.model_validate(media).model_copy(
+        update={"popularity_score": len(media.comments) + len(media.reactions)}
+    )
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

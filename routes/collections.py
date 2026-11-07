@@ -3,7 +3,7 @@ from math import ceil
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -11,7 +11,10 @@ from database import get_db
 from models import (
     Collection,
     CollectionInvitation,
+    Comment,
     Media,
+    MediaType,
+    Reaction,
     User,
     UserCollection,
     UserCollectionRole,
@@ -28,6 +31,7 @@ from schemas import (
 )
 from utils.auth import get_current_user
 from utils.invitations import generate_invitation_token, hash_invitation_token
+from utils.sorting import MediaSort
 
 router = APIRouter(
     prefix="/collections",
@@ -106,6 +110,25 @@ async def get_collection(
         int,
         Query(ge=1, le=50, description="Number of media items per page"),
     ] = 10,
+    sort_by: Annotated[
+        MediaSort, Query(description="Sort media items by this field")
+    ] = MediaSort.UPLOADED_AT_DESC,
+    uploaded_at_from: Annotated[
+        datetime | None,
+        Query(description="Filter media items uploaded from this date"),
+    ] = None,
+    uploaded_at_to: Annotated[
+        datetime | None,
+        Query(description="Filter media items uploaded until this date"),
+    ] = None,
+    media_type: Annotated[
+        MediaType | None,
+        Query(description="Filter media items by type"),
+    ] = None,
+    authors: Annotated[
+        list[int] | None,
+        Query(description="Filter media items by author IDs"),
+    ] = None,
 ) -> CollectionRetrieveDetailed:
     stmt = (
         select(Collection)
@@ -151,13 +174,54 @@ async def get_collection(
     )
 
     media_stmt = (
-        select(Media)
+        select(
+            Media,
+            (
+                (
+                    select(func.count(Reaction.id))
+                    .where(Reaction.media_id == Media.id)
+                    .correlate(Media)
+                    .scalar_subquery()
+                )
+                + (
+                    select(func.count(Comment.id))
+                    .where(Comment.media_id == Media.id)
+                    .correlate(Media)
+                    .scalar_subquery()
+                )
+            ).label("popularity_score"),
+        )
         .where(Media.collection_id == collection_id)
-        .order_by(Media.uploaded_at.desc(), Media.id.desc())
+        .options(selectinload(Media.uploaded_by))
     )
+
+    # filters
+    if uploaded_at_from:
+        media_stmt = media_stmt.where(Media.uploaded_at >= uploaded_at_from)
+    if uploaded_at_to:
+        media_stmt = media_stmt.where(Media.uploaded_at <= uploaded_at_to)
+    if media_type:
+        media_stmt = media_stmt.where(Media.media_type == media_type)
+    if authors:
+        media_stmt = media_stmt.where(Media.uploaded_by_id.in_(authors))
+
+    if sort_by == MediaSort.UPLOADED_AT_DESC:
+        media_stmt = media_stmt.order_by(Media.uploaded_at.desc(), Media.id.desc())
+    elif sort_by == MediaSort.UPLOADED_AT_ASC:
+        media_stmt = media_stmt.order_by(Media.uploaded_at.asc(), Media.id.asc())
+    elif sort_by == MediaSort.POPULARITY_DESC:
+        media_stmt = media_stmt.order_by(desc("popularity_score"), Media.id.desc())
+    elif sort_by == MediaSort.POPULARITY_ASC:
+        media_stmt = media_stmt.order_by("popularity_score", Media.id.asc())
+    else:
+        media_stmt = media_stmt.order_by(Media.uploaded_at.desc(), Media.id.desc())
+
     media_result = await db.execute(media_stmt)
     media_items = [
-        MediaRetrieve.model_validate(media) for media in media_result.scalars().all()
+        MediaRetrieve.model_validate(media).model_copy(
+            update={"popularity_score": score}
+        )
+        for media, score in media_result.all()
     ]
     paginated_media = PaginatedResponse[MediaRetrieve].from_items(
         media_items,

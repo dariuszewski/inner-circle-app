@@ -134,12 +134,12 @@ class Collection(Base):
     )
 
     name: Mapped[str] = mapped_column(
-        String(100),
+        String(50),
         nullable=False,
     )
 
     description: Mapped[str | None] = mapped_column(
-        String(500),
+        String(300),
         nullable=True,
     )
 
