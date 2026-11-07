@@ -20,6 +20,7 @@ import CollectionPage from './pages/CollectionPage.tsx';
 import HomePage from './pages/HomePage.tsx';
 import InvitePage from './pages/InvitePage.tsx';
 import NotFoundPage from './pages/NotFoundPage.tsx';
+import VerifyEmailLinkPage from './pages/verification/VerifyEmailLinkPage.tsx';
 import { AuthProvider } from './providers/AuthContextProvider.tsx';
 
 // auth routes loaded when needed
@@ -28,7 +29,6 @@ const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage.ts
 const LoginPage = lazy(() => import('./pages/auth/LoginPage.tsx'));
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage.tsx'));
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage.tsx'));
-const VerifyEmailLinkPage = lazy(() => import('./pages/verification/VerifyEmailLinkPage.tsx'));
 
 // settings routes loaded when needed
 const ChangeEmailPage = lazy(() => import('./pages/settings/ChangeEmailPage.tsx'));
