@@ -178,9 +178,12 @@ class CollectionUpdate(BaseModel):
 
 class CollectionRetrieve(CollectionBase):
     model_config = ConfigDict(from_attributes=True)
-
     id: int
+
     created_at: datetime
+    number_members: int = 1
+    number_items: int = 0
+    last_activity: datetime | None = None
     cover_image: MediaRetrieve | None = None
 
 

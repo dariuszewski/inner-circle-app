@@ -1,4 +1,5 @@
 import AddIcon from '@mui/icons-material/Add'
+import FilterAltIcon from '@mui/icons-material/FilterAlt'
 import {
   Box,
   Button,
@@ -14,22 +15,32 @@ import {
 import { useState } from 'react'
 
 import { createCollection } from '../api/collection'
+import CollectionListFilterBar from '../components/CollectionListFilterBar'
 import CollectionListItemCard from '../components/CollectionListItemCard'
 import CustomIconButton from '../components/CustomIconButton'
 import SlidingSnackbar from '../components/SlidingSnackbar'
 import { useCollections } from '../hooks/useCollections'
+import { useUsers } from '../hooks/useUsers'
 import { useAuth } from '../providers/useAuth'
+import { type CollectionFilters,defaultCollectionFilters } from '../types/collectionFilters'
 
 
 export default function CollectionListPage() {
   const auth = useAuth()
   const [page, setPage] = useState(1)
-  const { data, isLoading, error, refetch } = useCollections(page)
+  const [filters, setFilters] = useState<CollectionFilters>(defaultCollectionFilters)
+  const { data, isLoading, error, refetch } = useCollections(page, filters)
+  const [filterBarOpen, setFilterBarOpen] = useState(false)
+  const { users: members, isLoading: membersLoading } = useUsers(filterBarOpen)
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'danger' } | null>(null)
   const [collectionTitle, setCollectionTitle] = useState('')
   const [collectionDescription, setCollectionDescription] = useState('')
+  // Sorting never hides collections, so it doesn't count as filtering.
+  const isFiltering = Boolean(
+    filters.search.trim() || filters.from || filters.to || filters.memberIds.length,
+  )
 
   const handleOpen = () => {
     setOpen(true)
@@ -92,13 +103,34 @@ export default function CollectionListPage() {
           My Collections ({data?.total_items ?? 0})
         </Typography>
 
-        <CustomIconButton
-          onClick={handleOpen}
-          ariaLabel="add collection"
-        >
-          <AddIcon />
-        </CustomIconButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <CustomIconButton
+            onClick={() => setFilterBarOpen(!filterBarOpen)}
+            ariaLabel="filter collections"
+          >
+            <FilterAltIcon />
+          </CustomIconButton>
+
+          <CustomIconButton
+            onClick={handleOpen}
+            ariaLabel="add collection"
+          >
+            <AddIcon />
+          </CustomIconButton>
+        </Box>
       </Box>
+
+      <CollectionListFilterBar
+        open={filterBarOpen}
+        value={filters}
+        onChange={(next) => {
+          setFilters(next)
+          setPage(1)
+        }}
+        onHide={() => setFilterBarOpen(false)}
+        members={members}
+        membersLoading={membersLoading}
+      />
 
       {data?.total_items === 0 ? (
         <Box
@@ -114,11 +146,13 @@ export default function CollectionListPage() {
           }}
         >
           <Typography variant="h6" sx={{ mb: 1, color: 'primary.main' }}>
-            No collections yet
+            {isFiltering ? 'No matching collections' : 'No collections yet'}
           </Typography>
 
           <Typography variant="body2">
-            Press the “+” button to create your first collection.
+            {isFiltering
+              ? 'Try changing or resetting your filters.'
+              : 'Press the “+” button to create your first collection.'}
           </Typography>
         </Box>
       ) : (
@@ -130,6 +164,8 @@ export default function CollectionListPage() {
               title={collection.name}
               body={collection.description}
               imageSrc={collection.cover_image?.media_url}
+              itemsCount={collection.number_items}
+              membersCount={collection.number_members}
             />
           ))}
         </>

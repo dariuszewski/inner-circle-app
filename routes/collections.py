@@ -3,7 +3,7 @@ from math import ceil
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -31,7 +31,7 @@ from schemas import (
 )
 from utils.auth import get_current_user
 from utils.invitations import generate_invitation_token, hash_invitation_token
-from utils.sorting import MediaSort
+from utils.sorting import CollectionSort, MediaSort
 
 router = APIRouter(
     prefix="/collections",
@@ -43,18 +43,52 @@ router = APIRouter(
 async def get_collections(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_user)],
-    collection_name: Annotated[
+    text_query: Annotated[
         str | None, Query(description="Filter collections by name")
     ] = None,
-    collection_member: Annotated[
-        str | None, Query(description="Filter collections by member username")
+    collection_members: Annotated[
+        list[int] | None, Query(description="Filter collections by member ids")
     ] = None,
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     per_page: Annotated[int, Query(ge=1, le=50, description="Items per page")] = 2,
+    sort_by: Annotated[
+        CollectionSort, Query(description="Sort collections by this field")
+    ] = CollectionSort.CREATED_AT_DESC,
+    created_at_from: Annotated[
+        datetime | None,
+        Query(description="Filter collections created from this date"),
+    ] = None,
+    created_at_to: Annotated[
+        datetime | None,
+        Query(description="Filter collections created until this date"),
+    ] = None,
 ) -> PaginatedResponse[CollectionRetrieve]:
 
     stmt = (
-        select(Collection)
+        select(
+            Collection,
+            (
+                select(func.count(UserCollection.user_id))
+                .where(UserCollection.collection_id == Collection.id)
+                .correlate(Collection)
+                .scalar_subquery()
+            ).label("number_members"),
+            (
+                select(func.count(Media.id))
+                .where(Media.collection_id == Collection.id)
+                .correlate(Collection)
+                .scalar_subquery()
+            ).label("number_items"),
+            func.coalesce(
+                (
+                    select(func.max(Media.uploaded_at))
+                    .where(Media.collection_id == Collection.id)
+                    .correlate(Collection)
+                    .scalar_subquery()
+                ),
+                Collection.created_at,
+            ).label("last_activity"),
+        )
         .where(
             Collection.id.in_(
                 select(UserCollection.collection_id).where(
@@ -64,25 +98,58 @@ async def get_collections(
         )
         .options(selectinload(Collection.cover_image).selectinload(Media.uploaded_by))
     )
-    if collection_name:
-        stmt = stmt.where(Collection.name.ilike(f"%{collection_name}%"))
-    if collection_member:
+
+    if text_query:
+        stmt = stmt.where(
+            or_(
+                Collection.name.ilike(f"%{text_query}%"),
+                Collection.description.ilike(f"%{text_query}%"),
+            )
+        )
+
+    if collection_members:
         stmt = stmt.where(
             Collection.id.in_(
                 select(UserCollection.collection_id).where(
-                    UserCollection.user.has(
-                        User.username.ilike(f"%{collection_member}%")
-                    )
+                    UserCollection.user.has(User.id.in_(collection_members))
                 )
             )
         )
+
+    if created_at_from:
+        stmt = stmt.where(Collection.created_at >= created_at_from)
+    if created_at_to:
+        stmt = stmt.where(Collection.created_at <= created_at_to)
 
     total_items = (
         await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     )
 
-    query = await db.execute(stmt.offset((page - 1) * per_page).limit(per_page))
-    collections = query.scalars().all()
+    # sorting
+    if sort_by == CollectionSort.CREATED_AT_DESC:
+        stmt = stmt.order_by(Collection.created_at.desc(), Collection.id.desc())
+    elif sort_by == CollectionSort.CREATED_AT_ASC:
+        stmt = stmt.order_by(Collection.created_at.asc(), Collection.id.asc())
+    elif sort_by == CollectionSort.LAST_ACTIVITY_DESC:
+        stmt = stmt.order_by(desc("last_activity"), Collection.id.desc())
+    elif sort_by == CollectionSort.LAST_ACTIVITY_ASC:
+        stmt = stmt.order_by("last_activity", Collection.id.asc())
+    elif sort_by == CollectionSort.NUMBER_ITEMS_DESC:
+        stmt = stmt.order_by(desc("number_items"), Collection.id.desc())
+    elif sort_by == CollectionSort.NUMBER_ITEMS_ASC:
+        stmt = stmt.order_by("number_items", Collection.id.asc())
+    elif sort_by == CollectionSort.NUMBER_MEMBERS_DESC:
+        stmt = stmt.order_by(desc("number_members"), Collection.id.desc())
+    elif sort_by == CollectionSort.NUMBER_MEMBERS_ASC:
+        stmt = stmt.order_by("number_members", Collection.id.asc())
+    elif sort_by == CollectionSort.NAME_DESC:
+        stmt = stmt.order_by(Collection.name.desc(), Collection.id.desc())
+    elif sort_by == CollectionSort.NAME_ASC:
+        stmt = stmt.order_by(Collection.name.asc(), Collection.id.asc())
+    else:
+        stmt = stmt.order_by(Collection.created_at.desc(), Collection.id.desc())
+
+    rows = (await db.execute(stmt.offset((page - 1) * per_page).limit(per_page))).all()
 
     response = PaginatedResponse[CollectionRetrieve](
         total_items=total_items,
@@ -90,7 +157,14 @@ async def get_collections(
         per_page=per_page,
         total_pages=ceil(total_items / per_page) if total_items else 0,
         items=[
-            CollectionRetrieve.model_validate(collection) for collection in collections
+            CollectionRetrieve.model_validate(collection).model_copy(
+                update={
+                    "number_members": number_members,
+                    "number_items": number_items,
+                    "last_activity": last_activity,
+                }
+            )
+            for collection, number_members, number_items, last_activity in rows
         ],
     )
 

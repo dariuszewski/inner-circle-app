@@ -92,6 +92,7 @@ async def get_users(
     current_user: Annotated[UserRetrievePrivate, Depends(get_current_active_user)],
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     per_page: Annotated[int, Query(ge=1, le=50, description="Items per page")] = 10,
+    username: Annotated[str | None, Query(description="Filter by username")] = None,
 ) -> PaginatedResponse[UserRetrievePublic]:
     if current_user.user_role == UserRole.ADMIN:
         users_query = select(User)
@@ -109,6 +110,9 @@ async def get_users(
             .where(User.id != current_user.id)
             .distinct()
         )
+
+    if username:
+        users_query = users_query.where(User.username.ilike(f"%{username}%"))
 
     total_items = (
         await db.scalar(select(func.count()).select_from(users_query.subquery())) or 0

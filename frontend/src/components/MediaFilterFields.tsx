@@ -9,55 +9,19 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 
 import type { MediaFilters, MediaTypeFilter } from '../types/mediaFilters'
 import type { UserResponsePublic } from '../types/userResponse'
+import { autocompleteSlotProps, menuProps } from './filterMenuStyles'
 
-// Matches the reaction menu in MediaGalleryViewer.
-const menuProps = {
-	slotProps: {
-		paper: {
-			sx: {
-				backgroundColor: 'grey.900',
-				backgroundImage: 'none',
-				color: 'common.white',
-				'& .MuiMenuItem-root:hover': { backgroundColor: 'grey.800' },
-				'& .MuiMenuItem-root.Mui-selected': { backgroundColor: 'grey.800' },
-				'& .MuiMenuItem-root.Mui-selected:hover': { backgroundColor: 'grey.700' },
-			},
-		},
-	},
-}
+const fieldSx = { flex: '1 1 160px', minWidth: 140 }
 
 type MediaFilterFieldsProps = {
 	value: MediaFilters
 	onChange: (value: MediaFilters) => void
 	members: UserResponsePublic[]
-	direction?: 'column' | 'row'
 }
 
-export default function MediaFilterFields({
-	value,
-	onChange,
-	members,
-	direction = 'column',
-}: MediaFilterFieldsProps) {
-	const isRow = direction === 'row'
-	const fieldSx = isRow ? { flex: '1 1 160px', minWidth: 140 } : undefined
-	const dateSx = {
-		flex: 1,
-		minWidth: 0,
-		'& input': { fontSize: '0.85rem', px: 1 },
-		'& input::-webkit-calendar-picker-indicator': { filter: 'invert(1)', ml: 0 },
-	}
-
+export default function MediaFilterFields({ value, onChange, members }: MediaFilterFieldsProps) {
 	return (
-		<Box
-			sx={{
-				display: 'flex',
-				flexDirection: direction,
-				flexWrap: 'wrap',
-				alignItems: isRow ? 'center' : 'stretch',
-				gap: 2,
-			}}
-		>
+		<Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2 }}>
 			<Box sx={{ display: 'flex', gap: 1, ...fieldSx }}>
 				<TextField
 					select
@@ -98,7 +62,12 @@ export default function MediaFilterFields({
 						inputLabel: { shrink: true },
 						htmlInput: { max: value.to || undefined },
 					}}
-					sx={dateSx}
+					sx={{
+						flex: 1,
+						minWidth: 0,
+						'& input': { fontSize: '0.85rem', px: 1 },
+						'& input::-webkit-calendar-picker-indicator': { filter: 'invert(1)', ml: 0 },
+					}}
 				/>
 				<TextField
 					type="date"
@@ -110,7 +79,12 @@ export default function MediaFilterFields({
 						inputLabel: { shrink: true },
 						htmlInput: { min: value.from || undefined },
 					}}
-					sx={dateSx}
+					sx={{
+						flex: 1,
+						minWidth: 0,
+						'& input': { fontSize: '0.85rem', px: 1 },
+						'& input::-webkit-calendar-picker-indicator': { filter: 'invert(1)', ml: 0 },
+					}}
 				/>
 			</Box>
 
@@ -153,20 +127,7 @@ export default function MediaFilterFields({
 						</li>
 					)
 				}}
-				slotProps={{
-					paper: {
-						sx: {
-							backgroundColor: 'grey.900',
-							backgroundImage: 'none',
-							color: 'common.white',
-							'& .MuiAutocomplete-option.Mui-focused': { backgroundColor: 'grey.800' },
-							'& .MuiAutocomplete-option[aria-selected="true"]': { backgroundColor: 'grey.800' },
-							'& .MuiAutocomplete-option[aria-selected="true"].Mui-focused': {
-								backgroundColor: 'grey.700',
-							},
-						},
-					},
-				}}
+				slotProps={autocompleteSlotProps}
 				sx={fieldSx}
 			/>
 		</Box>

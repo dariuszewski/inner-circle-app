@@ -1,3 +1,5 @@
+import PeopleIcon from '@mui/icons-material/People'
+import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -13,6 +15,8 @@ type CollectionListItemCardProps = {
   title: string
   body?: string | null
   imageSrc?: string | null
+  itemsCount: number
+  membersCount: number
 }
 
 function CollectionListItemCard({
@@ -20,6 +24,8 @@ function CollectionListItemCard({
   title,
   body,
   imageSrc,
+  itemsCount,
+  membersCount,
 }: CollectionListItemCardProps) {
   const navigate = useNavigate()
   const imageUrl = useProtectedMedia(imageSrc)
@@ -113,6 +119,25 @@ function CollectionListItemCard({
         >
           {body}
         </Typography>
+
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            mt: 2,
+            color: 'rgba(255, 255, 255, 0.9)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }} title="Items">
+            <PhotoLibraryIcon fontSize="small" />
+            <Typography variant="body2">{itemsCount}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }} title="Members">
+            <PeopleIcon fontSize="small" />
+            <Typography variant="body2">{membersCount}</Typography>
+          </Box>
+        </Box>
       </CardContent>
     </Card>
   )

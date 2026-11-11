@@ -1,4 +1,5 @@
 
+import type { CollectionFilters } from '../types/collectionFilters'
 import type {
   CollectionDetailedRetrieve,
   CollectionRetrieve,
@@ -26,6 +27,7 @@ type GetCollectionsRequest = {
   page: number
   pageSize: number
   accessToken: string
+  filters?: CollectionFilters
   signal?: AbortSignal | null
 }
 
@@ -98,9 +100,23 @@ async function getCollection({ collectionId, accessToken, filters, signal }: Get
   return (await response.json()) as CollectionDetailedRetrieve
 }
 
-async function getCollections({ page, pageSize, accessToken, signal }: GetCollectionsRequest): Promise<PaginatedResponse<CollectionRetrieve>> {
+async function getCollections({ page, pageSize, accessToken, filters, signal }: GetCollectionsRequest): Promise<PaginatedResponse<CollectionRetrieve>> {
+  const params = new URLSearchParams({ page: String(page), per_page: String(pageSize) })
+  if (filters) {
+    params.set('sort_by', `${filters.order === 'desc' ? '-' : ''}${filters.sort}`)
+    // Local day boundaries, sent as UTC instants.
+    if (filters.from) {
+      params.set('created_at_from', new Date(`${filters.from}T00:00:00`).toISOString())
+    }
+    if (filters.to) {
+      params.set('created_at_to', new Date(`${filters.to}T23:59:59.999`).toISOString())
+    }
+    if (filters.search.trim()) params.set('text_query', filters.search.trim())
+    filters.memberIds.forEach((id) => params.append('collection_members', String(id)))
+  }
+
   const response = await fetch(
-    `/api/collections?page=${page}&per_page=${pageSize}`,
+    `/api/collections?${params}`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,

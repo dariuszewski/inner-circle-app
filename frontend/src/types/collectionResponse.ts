@@ -35,6 +35,8 @@ export type CollectionRetrieve = {
   name: string;
   description: string | null;
   created_at: string;
+  number_members: number;
+  number_items: number;
   cover_image: MediaRetrieve | null;
 };
 

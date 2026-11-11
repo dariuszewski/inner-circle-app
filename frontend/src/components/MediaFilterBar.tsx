@@ -34,7 +34,6 @@ export default function MediaFilterBar({ open, value, onChange, members, onHide 
 						value={value}
 						onChange={onChange}
 						members={members}
-						direction="row"
 					/>
 				</Box>
 				<Box sx={{ display: 'flex', flexDirection: 'column' }}>

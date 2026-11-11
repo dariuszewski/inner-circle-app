@@ -58,21 +58,20 @@ async def test_get_collections_and_filters(
     assert response.json()["total_items"] == 2
 
     # Assert that the active user can filter collections by name
-    response = await client.get("/api/collections?collection_name=1st", headers=headers)
+    response = await client.get("/api/collections?text_query=1st", headers=headers)
     assert len(response.json()["items"]) == 1
     assert response.json()["total_items"] == 1
 
-    # Assert that the active user can filter collections by member username
+    # Assert that the active user can filter collections by member id
     response = await client.get(
-        "/api/collections?collection_member=passive", headers=headers
+        f"/api/collections?collection_members={user_passive['id']}", headers=headers
     )
-    print(response.json())
     assert len(response.json()["items"]) == 1
     assert response.json()["total_items"] == 1
 
-    # Assert that the active user can filter collections by name and member username
+    # Assert that the active user can filter collections by name and member id
     response = await client.get(
-        "/api/collections?collection_name=1st&collection_member=passive",
+        f"/api/collections?text_query=1st&collection_members={user_passive['id']}",
         headers=headers,
     )
     assert len(response.json()["items"]) == 1

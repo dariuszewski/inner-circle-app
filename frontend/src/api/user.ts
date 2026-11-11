@@ -1,4 +1,8 @@
-import type { UserResponsePrivate } from "../types/userResponse";
+import type { PaginatedResponse } from "../types/collectionResponse";
+import type { UserResponsePrivate, UserResponsePublic } from "../types/userResponse";
+
+// Backend maximum for per_page.
+const USERS_PER_PAGE = 50;
 
 export type VerificationRequestResponse = {
     detail: string;
@@ -23,6 +27,32 @@ async function parseError(response: Response, fallback: string): Promise<Error> 
         // response body was not JSON, fall through to the generic message
     }
     return new Error(fallback);
+}
+
+export async function getAllUsers(accessToken: string, signal?: AbortSignal): Promise<UserResponsePublic[]> {
+    const users: UserResponsePublic[] = [];
+    let page = 1;
+    let totalPages = 1;
+
+    while (page <= totalPages) {
+        const response = await fetch(`/api/users?page=${page}&per_page=${USERS_PER_PAGE}`, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            },
+            signal,
+        });
+
+        if (!response.ok) {
+            throw await parseError(response, 'Failed to fetch users');
+        }
+
+        const body = (await response.json()) as PaginatedResponse<UserResponsePublic>;
+        users.push(...body.items);
+        totalPages = body.total_pages;
+        page += 1;
+    }
+
+    return users;
 }
 
 export async function requestAccountDeletion(accessToken: string): Promise<VerificationRequestResponse> {

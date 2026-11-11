@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { getCollections } from '../api/collection'
 import { useAuth } from '../providers/useAuth'
+import type { CollectionFilters } from '../types/collectionFilters'
 import type {
   CollectionRetrieve,
   PaginatedResponse,
@@ -16,6 +17,7 @@ type CollectionsState = {
 
 export function useCollections(
   page: number,
+  filters: CollectionFilters,
   pageSize: number = 4,
 ): CollectionsState {
   const auth = useAuth()
@@ -37,6 +39,7 @@ export function useCollections(
       page,
       pageSize,
       accessToken: auth.accessToken,
+      filters,
     })
 
     setState({
@@ -44,7 +47,7 @@ export function useCollections(
       isLoading: false,
       error: null,
     })
-  }, [auth.accessToken, page, pageSize])
+  }, [auth.accessToken, page, pageSize, filters])
 
   const refetch = useCallback(async () => {
     try {
@@ -78,6 +81,7 @@ export function useCollections(
           page,
           pageSize,
           accessToken: auth.accessToken,
+          filters,
         })
 
         if (!cancelled) {
@@ -106,7 +110,7 @@ export function useCollections(
     return () => {
       cancelled = true
     }
-  }, [auth.accessToken, page, pageSize])
+  }, [auth.accessToken, page, pageSize, filters])
 
   return {
     ...state,

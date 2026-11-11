@@ -217,7 +217,7 @@ function CollectionPage() {
                     )}
 
                     <CustomIconButton
-                        onClick={() => setFilterBarOpen((open) => !open)}
+                        onClick={() => setFilterBarOpen(!filterBarOpen)}
                         ariaLabel="sort and filter"
                     >
                         <FilterAltIcon />
